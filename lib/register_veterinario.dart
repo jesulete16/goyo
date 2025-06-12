@@ -5,6 +5,8 @@ import 'dart:typed_data';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'register_menu.dart';
+import 'login.dart';
+import 'widgets/flutter_web_wrapper.dart';
 
 class RegisterVeterinario extends StatefulWidget {
   const RegisterVeterinario({super.key});
@@ -106,39 +108,75 @@ class _RegisterVeterinarioState extends State<RegisterVeterinario> with TickerPr
       _showSnackBar('Error al seleccionar imagen: $e', isError: true);
     }
   }
-
   Future<String?> _uploadImage() async {
     try {
       if (_webImage == null && _selectedImage == null) return null;
 
       final supabase = Supabase.instance.client;
-      final String fileName = '${_nameController.text.toLowerCase().replaceAll(' ', '_')}_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Generar nombre único para el archivo
+      final String fileName = 'vet_${DateTime.now().millisecondsSinceEpoch}_${_nameController.text.toLowerCase().replaceAll(' ', '_').replaceAll(RegExp(r'[^a-z0-9_]'), '')}';
       
       Uint8List imageBytes;
-      String fileExtension;
+      String fileExtension = 'jpg';
       
       if (kIsWeb && _webImage != null) {
-        imageBytes = _webImage!;
-        fileExtension = 'jpg';
-      } else if (_selectedImage != null) {
+        imageBytes = _webImage!;      } else if (_selectedImage != null) {
         imageBytes = await _selectedImage!.readAsBytes();
-        fileExtension = _selectedImage!.path.split('.').last.toLowerCase();
+        final String originalExtension = _selectedImage!.path.split('.').last.toLowerCase();
+        if (['jpg', 'jpeg', 'png', 'webp'].contains(originalExtension)) {
+          fileExtension = originalExtension;
+        }
       } else {
         return null;
       }
 
       final String fullFileName = '$fileName.$fileExtension';
       
-      await supabase.storage
-          .from('veterinario-photos')
-          .uploadBinary(
-            fullFileName,
-            imageBytes,
-            fileOptions: const FileOptions(
-              cacheControl: '3600',
-              upsert: false,
-            ),
-          );
+      // Intentar subir a storage con manejo de errores mejorado
+      try {
+        await supabase.storage
+            .from('veterinario-photos')
+            .uploadBinary(
+              fullFileName,
+              imageBytes,
+              fileOptions: FileOptions(
+                cacheControl: '3600',
+                upsert: true, // Permitir sobrescribir si existe
+                contentType: 'image/$fileExtension',
+              ),
+            );
+      } catch (storageError) {
+        print('Error de storage: $storageError');
+        
+        // Si falla el primer intento, intentar con un bucket público o crear el archivo
+        if (storageError.toString().contains('row-level security') || 
+            storageError.toString().contains('Unauthorized')) {
+          
+          // Intentar con un nombre más simple
+          final String simpleFileName = 'vet_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+          
+          await supabase.storage
+              .from('veterinario-photos')
+              .uploadBinary(
+                simpleFileName,
+                imageBytes,
+                fileOptions: FileOptions(
+                  cacheControl: '3600',
+                  upsert: true,
+                  contentType: 'image/$fileExtension',
+                ),
+              );
+          
+          final String publicUrl = supabase.storage
+              .from('veterinario-photos')
+              .getPublicUrl(simpleFileName);
+          
+          return publicUrl;
+        } else {
+          rethrow;
+        }
+      }
 
       final String publicUrl = supabase.storage
           .from('veterinario-photos')
@@ -146,7 +184,15 @@ class _RegisterVeterinarioState extends State<RegisterVeterinario> with TickerPr
 
       return publicUrl;
     } catch (e) {
-      print('Error uploading image: $e');
+      print('Error general uploading image: $e');
+      
+      // Si todo falla, devolver una URL por defecto o null
+      if (e.toString().contains('row-level security') || 
+          e.toString().contains('Unauthorized')) {
+        print('Problema de permisos de storage, continuando sin imagen...');
+        return null; // Permitir registro sin imagen en caso de problemas de permisos
+      }
+      
       return null;
     }
   }
@@ -165,14 +211,8 @@ class _RegisterVeterinarioState extends State<RegisterVeterinario> with TickerPr
       return false;
     }
   }
-
   void _registerVeterinario() async {
     if (!_formKey.currentState!.validate()) return;
-
-    if (_selectedImage == null && _webImage == null) {
-      _showSnackBar('Por favor selecciona una foto de perfil', isError: true);
-      return;
-    }
 
     if (_selectedSpecialty == null) {
       _showSnackBar('Por favor selecciona una especialidad', isError: true);
@@ -199,31 +239,59 @@ class _RegisterVeterinarioState extends State<RegisterVeterinario> with TickerPr
         return;
       }
 
-      // Subir imagen
-      final String? imageUrl = await _uploadImage();      // Registrar veterinario en la base de datos
-      await Supabase.instance.client
+      // Intentar subir imagen (opcional)
+      String? imageUrl;
+      if (_selectedImage != null || _webImage != null) {
+        try {
+          imageUrl = await _uploadImage();
+          if (imageUrl == null) {
+            _showSnackBar('Advertencia: No se pudo subir la imagen, pero el registro continuará', isError: false);
+          }
+        } catch (e) {
+          print('Error al subir imagen, continuando sin ella: $e');
+          _showSnackBar('Advertencia: Problema con la imagen, registrando sin foto', isError: false);
+        }
+      }      // Registrar veterinario en la base de datos
+      print('🔵 Iniciando registro de veterinario...');
+      print('📧 Email: ${_emailController.text.trim()}');
+      print('👤 Nombre: ${_nameController.text.trim()}');
+      print('🏥 Especialidad: $_selectedSpecialty');
+      
+      final veterinarioData = {
+        'nombre': _nameController.text.trim(),
+        'correo': _emailController.text.trim(),
+        'contraseña': _passwordController.text, // Se encriptará automáticamente por el trigger
+        'ubicacion': _locationController.text.trim(),
+        'especialidad': _selectedSpecialty!,
+        'numero_colegiado': _collegeNumberController.text.trim(),
+        'años_experiencia': int.parse(_experienceController.text.trim()),
+        'telefono': _phoneController.text.trim(),
+        'foto_url': imageUrl,
+      };
+      
+      print('📝 Datos a insertar: $veterinarioData');
+      
+      final response = await Supabase.instance.client
           .from('veterinarios')
-          .insert({
-            'nombre': _nameController.text.trim(),
-            'correo': _emailController.text.trim(),
-            'contraseña': _passwordController.text, // Se encriptará automáticamente por el trigger
-            'ubicacion': _locationController.text.trim(),
-            'especialidad': _selectedSpecialty!,
-            'numero_colegiado': _collegeNumberController.text.trim(),
-            'años_experiencia': int.parse(_experienceController.text.trim()),
-            'telefono': _phoneController.text.trim(),
-            'foto_url': imageUrl,
-          });
-
-      if (mounted) {
+          .insert(veterinarioData);
+      
+      print('✅ Respuesta de Supabase: $response');
+      print('🎉 Veterinario registrado exitosamente en la base de datos');if (mounted) {
         setState(() {
           _isLoading = false;
-        });        _showSnackBar('Veterinario "${_nameController.text}" registrado exitosamente');
+        });
+        
+        _showSnackBar('Veterinario "${_nameController.text}" registrado exitosamente');
         
         // Navegar al login después de un breve delay
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+          // Usar Navigator.pushReplacement en lugar de pushNamedAndRemoveUntil para mejor compatibilidad web
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const FlutterWebWrapper(child: LoginScreen()),
+            ),
+          );
         }
       }
     } catch (e) {
@@ -503,14 +571,13 @@ class _RegisterVeterinarioState extends State<RegisterVeterinario> with TickerPr
                                 ),
                               ],
                             ),
-                          ),
-                          if (_selectedImage == null && _webImage == null)
+                          ),                          if (_selectedImage == null && _webImage == null)
                             Padding(
                               padding: const EdgeInsets.only(top: 5),
                               child: Text(
-                                'Obligatorio',
+                                'Opcional',
                                 style: TextStyle(
-                                  color: Colors.orange[200],
+                                  color: Colors.blue[200],
                                   fontSize: isDesktop ? 10 : 9,
                                   fontWeight: FontWeight.w600,
                                   shadows: const [

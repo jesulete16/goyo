@@ -70,101 +70,79 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
-  }  void _login() async {
+  }
+  void _login() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
-      });
-
-      try {
-        print('🔍 Intentando login para: ${_emailController.text.trim()}');
-        print('🔍 Tipo de usuario: $_selectedUserType');
+      });      try {
+        print('🔍 Intentando login para: ${_emailController.text.trim()} como $_selectedUserType');
         
         // Verificar credenciales en la tabla correspondiente
         final tableName = _selectedUserType == 'veterinario' ? 'veterinarios' : 'animales';
         
-        // Primero buscar el usuario por correo
+        // Primero obtener el usuario por correo
         final userRecord = await Supabase.instance.client
             .from(tableName)
             .select()
             .eq('correo', _emailController.text.trim())
             .maybeSingle();
 
+        print('🔍 Usuario encontrado: ${userRecord != null}');
+
+        // Si el usuario existe, verificar la contraseña usando la función de la base de datos
+        bool isPasswordValid = false;
         if (userRecord != null) {
-          print('🔍 Usuario encontrado: ${userRecord['nombre']}');
+          print('🔑 Verificando contraseña...');
           
-          // Verificar contraseña usando la función verify_password de la base de datos
-          final passwordCheck = await Supabase.instance.client
+          final passwordVerification = await Supabase.instance.client
               .rpc('verify_password', params: {
                 'input_password': _passwordController.text,
-                'stored_password': userRecord['contraseña']
+                'stored_password': userRecord['contraseña'],
               });
           
-          print('🔑 Verificación de contraseña: $passwordCheck');
+          isPasswordValid = passwordVerification == true;
+          print('🔑 Contraseña válida: $isPasswordValid');
+        }        if (userRecord != null && isPasswordValid) {
+          print('✅ Login exitoso para: ${userRecord['nombre']}');
           
-          if (passwordCheck == true) {
-            print('✅ Login exitoso');
-            // Crear una sesión ficticia para navegación (sin autenticación real de Supabase)
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Colors.white),
-                      const SizedBox(width: 12),
-                      Text('¡Bienvenido ${userRecord['nombre']}!'),
-                    ],
-                  ),
-                  backgroundColor: const Color(0xFF2E7D32),
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+          // Crear una sesión ficticia para navegación (sin autenticación real de Supabase)
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.white),
+                    const SizedBox(width: 12),
+                    Text('¡Bienvenido ${userRecord['nombre']}!'),
+                  ],
+                ),
+                backgroundColor: const Color(0xFF2E7D32),
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),            );
+              // Navegar según el tipo de usuario
+            if (_selectedUserType == 'animal') {
+              // Navegar al menú específico para animales
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => MenuAnimal(userData: userRecord),
                 ),
               );
-              
-              // Navegar según el tipo de usuario
-              if (_selectedUserType == 'animal') {
-                // Navegar al menú específico para animales
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => MenuAnimal(userData: userRecord),
-                  ),
-                );
-              } else {
-                // Navegar al menú específico para veterinarios
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(
-                    builder: (context) => MenuVeterinario(userData: userRecord),
-                  ),
-                );
-              }
-            }
-          } else {
-            print('❌ Contraseña incorrecta');
-            // Contraseña incorrecta
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Row(
-                    children: [
-                      const Icon(Icons.error, color: Colors.white),
-                      const SizedBox(width: 12),
-                      const Text('Contraseña incorrecta'),
-                    ],
-                  ),
-                  backgroundColor: Colors.red[700],
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+            } else {
+              // Navegar al menú específico para veterinarios
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => MenuVeterinario(userData: userRecord),
                 ),
               );
             }
           }
         } else {
-          print('❌ Usuario no encontrado');
-          // Usuario no encontrado
+          print('❌ Credenciales incorrectas');
+          // Credenciales incorrectas
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -172,7 +150,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                   children: [
                     const Icon(Icons.error, color: Colors.white),
                     const SizedBox(width: 12),
-                    const Text('Correo no encontrado'),
+                    Text(userRecord == null 
+                        ? 'Usuario no encontrado' 
+                        : 'Contraseña incorrecta'),
                   ],
                 ),
                 backgroundColor: Colors.red[700],
@@ -183,9 +163,8 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             );
           }
-        }
-      } catch (e) {
-        print('🚨 Error en login: $e');
+        }      } catch (e) {
+        print('❌ Error durante login: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

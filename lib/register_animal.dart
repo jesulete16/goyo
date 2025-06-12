@@ -13,13 +13,16 @@ class RegisterAnimal extends StatefulWidget {
   State<RegisterAnimal> createState() => _RegisterAnimalState();
 }
 
-class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = GlobalKey<FormState>();
+class _RegisterAnimalState extends State<RegisterAnimal> {
+  final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _locationController = TextEditingController();
   final _ageController = TextEditingController();
-  final _heightController = TextEditingController();    String? _selectedAnimalType;
+  final _heightController = TextEditingController();
+
+  String? _selectedAnimalType;
   String? _selectedBreed;
   XFile? _selectedImage;
   Uint8List? _webImage;
@@ -60,6 +63,7 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
       'Dragón Barbudo', 'Camaleón', 'Boa Constrictor'
     ]
   };
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -70,6 +74,7 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
     _heightController.dispose();
     super.dispose();
   }
+
   Future<void> _pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -87,7 +92,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
           setState(() {
             _webImage = bytes;
             _selectedImage = null;
-          });        } else {
+          });
+        } else {
           // Para móvil, usar XFile
           setState(() {
             _selectedImage = image;
@@ -103,18 +109,10 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
         ),
       );
     }
-  }  void _registerAnimal() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedImage == null && _webImage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Por favor selecciona una foto del animal'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-        return;
-      }
+  }
 
+  void _registerAnimal() async {
+    if (_formKey.currentState!.validate()) {
       if (_selectedAnimalType == null || _selectedBreed == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -143,35 +141,54 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
             _isLoading = false;
           });
           return;
-        }        // Subir imagen a Supabase Storage
+        }
+
+        // Subir imagen a Supabase Storage (opcional)
         String? imageUrl;
         if (_selectedImage != null || _webImage != null) {
-          if (kIsWeb && _webImage != null) {
-            imageUrl = await SupabaseService.uploadImageBytes(
-              _webImage!,
-              'animal-photos',
-              _nameController.text.toLowerCase().replaceAll(' ', '_'),
-              'jpg',
-            );          } else if (_selectedImage != null) {
-            final bytes = await _selectedImage!.readAsBytes();
-            final fileExt = _selectedImage!.path.split('.').last;
-            imageUrl = await SupabaseService.uploadImageBytes(
-              bytes,
-              'animal-photos',
-              _nameController.text.toLowerCase().replaceAll(' ', '_'),
-              fileExt,
-            );
+          print('🔄 Subiendo imagen...');
+          try {
+            if (kIsWeb && _webImage != null) {
+              imageUrl = await SupabaseService.uploadImageBytes(
+                _webImage!,
+                'animal-photos',
+                _nameController.text.toLowerCase().replaceAll(' ', '_'),
+                'jpg',
+              );
+            } else if (_selectedImage != null) {
+              final bytes = await _selectedImage!.readAsBytes();
+              final fileExt = _selectedImage!.path.split('.').last;
+              imageUrl = await SupabaseService.uploadImageBytes(
+                bytes,
+                'animal-photos',
+                _nameController.text.toLowerCase().replaceAll(' ', '_'),
+                fileExt,
+              );
+            }
+            
+            if (imageUrl != null) {
+              print('✅ Imagen subida exitosamente');
+            } else {
+              print('⚠️ No se pudo subir la imagen, continuando sin ella');
+            }
+          } catch (e) {
+            print('⚠️ Error subiendo imagen: $e - Continuando sin imagen');
+            imageUrl = null;
           }
-        }// Registrar animal en la base de datos
+        } else {
+          print('ℹ️ No se seleccionó imagen, registrando sin foto');
+        }
+
+        // Registrar animal en la base de datos
         final result = await SupabaseService.registerAnimal(
-          nombre: _nameController.text,
-          correo: _emailController.text,
+          nombre: _nameController.text.trim(),
+          correo: _emailController.text.trim(),
           password: _passwordController.text,
-          ubicacion: _locationController.text,
+          ubicacion: _locationController.text.trim(),
           tipo: _selectedAnimalType!,
           raza: _selectedBreed!,
-          edad: _ageController.text,
-          altura: _heightController.text,
+          edad: _ageController.text.trim(),
+          altura: _heightController.text.trim(),
           fotoUrl: imageUrl,
         );
 
@@ -180,7 +197,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
             _isLoading = false;
           });
 
-          if (result != null) {            ScaffoldMessenger.of(context).showSnackBar(
+          if (result != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Row(
                   children: [
@@ -272,30 +290,28 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                       tooltip: 'Volver',
                     ),
                   ),
-                  // Header compacto premium
                   SizedBox(height: 18),
+                  // Header compacto
                   Container(
-                    margin: const EdgeInsets.only(bottom: 10),
+                    margin: EdgeInsets.only(bottom: 10),
                     width: 70,
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.07),
+                      color: Colors.white.withOpacity(0.12),
+                      border: Border.all(color: Colors.white.withOpacity(0.25), width: 2),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.18),
-                          blurRadius: 18,
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 16,
                           offset: const Offset(0, 6),
                         ),
                       ],
                     ),
                     child: ClipOval(
                       child: Image.asset(
-                        'assets/images/logo.png',
+                        'assets/icon/goyo_icon.png',
                         fit: BoxFit.cover,
-                        width: 70,
-                        height: 70,
-                        filterQuality: FilterQuality.high,
                         errorBuilder: (context, error, stackTrace) {
                           return const Icon(
                             Icons.pets,
@@ -341,7 +357,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                     textAlign: TextAlign.center,
                   ),
                   SizedBox(height: 18),
-                  // Foto del animal
+                  
+                  // Foto del animal (opcional)
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 400),
                     curve: Curves.easeInOut,
@@ -383,64 +400,68 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                             ],
                           ),
                         ),
-                        SizedBox(height: 10),
+                        SizedBox(height: 12),
                         GestureDetector(
                           onTap: _pickImage,
                           child: Stack(
-                            alignment: Alignment.center,
                             children: [
                               AnimatedContainer(
-                                duration: const Duration(milliseconds: 350),
-                                width: 70,
-                                height: 70,
+                                duration: const Duration(milliseconds: 300),
+                                width: 100,
+                                height: 100,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.13),
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.circular(18),
+                                  color: Colors.white.withOpacity(0.1),
                                   border: Border.all(
-                                    color: (_selectedImage != null || _webImage != null)
-                                        ? Colors.greenAccent.withOpacity(0.7)
-                                        : Colors.white.withOpacity(0.22),
-                                    width: 2.0,
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1.5,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withOpacity(0.10),
-                                      blurRadius: 12,
+                                      color: Colors.black.withOpacity(0.1),
+                                      blurRadius: 8,
                                       offset: const Offset(0, 2),
                                     ),
                                   ],
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
+                                  borderRadius: BorderRadius.circular(16),
                                   child: (_selectedImage != null || _webImage != null)
-                                      ? (kIsWeb && _webImage != null
+                                      ? (kIsWeb && _webImage != null)
                                           ? Image.memory(
                                               _webImage!,
-                                              width: 70,
-                                              height: 70,
                                               fit: BoxFit.cover,
+                                              width: 100,
+                                              height: 100,
                                             )
-                                          : FutureBuilder<Uint8List>(
-                                              future: _selectedImage!.readAsBytes(),
-                                              builder: (context, snapshot) {
-                                                if (snapshot.hasData) {
-                                                  return Image.memory(
-                                                    snapshot.data!,
-                                                    width: 70,
-                                                    height: 70,
-                                                    fit: BoxFit.cover,
-                                                  );
-                                                } else {
-                                                  return const Center(child: CircularProgressIndicator(color: Colors.white));
-                                                }
-                                              },
-                                            ))
-                                      : Center(
-                                          child: Icon(
-                                            Icons.pets,
-                                            size: 32,
-                                            color: Colors.white.withOpacity(0.7),
-                                          ),
+                                          : _selectedImage != null
+                                              ? FutureBuilder<Uint8List>(
+                                                  future: _selectedImage!.readAsBytes(),
+                                                  builder: (context, snapshot) {
+                                                    if (snapshot.hasData) {
+                                                      return Image.memory(
+                                                        snapshot.data!,
+                                                        fit: BoxFit.cover,
+                                                        width: 100,
+                                                        height: 100,
+                                                      );
+                                                    }
+                                                    return const Icon(
+                                                      Icons.pets,
+                                                      size: 35,
+                                                      color: Colors.white70,
+                                                    );
+                                                  },
+                                                )
+                                              : const Icon(
+                                                  Icons.pets,
+                                                  size: 35,
+                                                  color: Colors.white70,
+                                                )
+                                      : const Icon(
+                                          Icons.add_photo_alternate,
+                                          size: 35,
+                                          color: Colors.white70,
                                         ),
                                 ),
                               ),
@@ -474,47 +495,39 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                           Padding(
                             padding: const EdgeInsets.only(top: 5),
                             child: Text(
-                              'Obligatorio',
+                              'Opcional',
                               style: TextStyle(
-                                color: Colors.orange[200],
+                                color: Colors.blue[200],
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                shadows: const [
-                                  Shadow(
-                                    color: Colors.black26,
-                                    blurRadius: 3,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  SizedBox(height: 10),
-                  // Card principal glassmorphism premium
+
+                  // Formulario
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.22),
+                      color: Colors.white.withOpacity(0.18),
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(
                         color: Colors.white.withOpacity(0.22),
-                        width: 1.2,
+                        width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.13),
-                          blurRadius: 24,
-                          offset: const Offset(0, 6),
+                          blurRadius: 18,
+                          offset: const Offset(0, 8),
                         ),
                       ],
-                      backgroundBlendMode: BlendMode.luminosity,
                     ),
                     child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(18),
                       child: BackdropFilter(
                         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                         child: Column(
@@ -580,6 +593,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                               },
                             ),
                             SizedBox(height: 10),
+                            
+                            // Tipo de animal
                             _buildDropdown(
                               value: _selectedAnimalType,
                               label: 'Tipo de Animal',
@@ -594,6 +609,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                               },
                             ),
                             SizedBox(height: 10),
+                            
+                            // Raza
                             if (_selectedAnimalType != null)
                               _buildDropdown(
                                 value: _selectedBreed,
@@ -608,15 +625,16 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                                 },
                               ),
                             if (_selectedAnimalType != null) SizedBox(height: 10),
+                            
+                            // Edad y Altura
                             Row(
                               children: [
                                 Expanded(
                                   child: _buildTextField(
                                     controller: _ageController,
                                     label: 'Edad',
-                                    hint: 'Años/meses',
+                                    hint: '2 años, 6 meses...',
                                     icon: Icons.cake,
-                                    keyboardType: TextInputType.text,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'La edad es obligatoria';
@@ -630,9 +648,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                                   child: _buildTextField(
                                     controller: _heightController,
                                     label: 'Altura',
-                                    hint: 'cm / metros',
+                                    hint: '50 cm, 1.2 metros...',
                                     icon: Icons.height,
-                                    keyboardType: TextInputType.text,
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
                                         return 'La altura es obligatoria';
@@ -644,6 +661,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
                               ],
                             ),
                             SizedBox(height: 18),
+                            
+                            // Botón registrar
                             SizedBox(
                               width: double.infinity,
                               height: 38,
@@ -747,7 +766,7 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
         ),
         filled: true,
         fillColor: Colors.white.withOpacity(0.1),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
     );
   }
@@ -762,6 +781,8 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
   }) {
     return DropdownButtonFormField<String>(
       value: value,
+      style: const TextStyle(color: Colors.white, fontSize: 16),
+      dropdownColor: const Color(0xFF1B5E20),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -789,20 +810,12 @@ class _RegisterAnimalState extends State<RegisterAnimal> {  final _formKey = Glo
         ),
         filled: true,
         fillColor: Colors.white.withOpacity(0.1),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       ),
-      dropdownColor: const Color(0xFF1B5E20),
-      style: const TextStyle(color: Colors.white, fontSize: 16),
-      icon: const Icon(Icons.arrow_drop_down, color: Colors.white70),
-      items: items.map((String item) {
-        return DropdownMenuItem<String>(
+      items: items.map((String item) => DropdownMenuItem<String>(
           value: item,
-          child: Text(
-            item,
-            style: const TextStyle(color: Colors.white),
-          ),
-        );
-      }).toList(),
+          child: Text(item, style: const TextStyle(color: Colors.white)),
+        )).toList(),
       onChanged: onChanged,
       validator: (value) {
         if (value == null || value.isEmpty) {

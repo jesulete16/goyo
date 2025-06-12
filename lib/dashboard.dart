@@ -6,10 +6,10 @@ class DashboardScreen extends StatefulWidget {
   final String userType; // 'veterinario' o 'animal'
 
   const DashboardScreen({
-    Key? key, 
+    super.key, 
     required this.user, 
     required this.userType,
-  }) : super(key: key);
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();

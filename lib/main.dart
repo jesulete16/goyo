@@ -1,11 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:typed_data';
 import 'splashscreen.dart';
 import 'login.dart';
+import 'widgets/flutter_web_wrapper.dart';
+import 'config/web_config.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Configurar Flutter Web si estamos en web
+  if (kIsWeb) {
+    WebConfig.configure();
+    WebConfig.setupErrorHandling();
+  }
+  
+  // Fix para Flutter Web - Deshabilitar elementos de entrada activos problemáticos
+  if (kIsWeb) {
+    // Configuración específica para Flutter Web
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Forzar el foco inicial para evitar problemas de elementos activos
+      FocusManager.instance.primaryFocus?.unfocus();
+    });
+  }
   
   await Supabase.initialize(
     url: 'https://grssfmgkbuflvpqtcaoh.supabase.co',
@@ -16,19 +34,35 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-  @override
+  const MyApp({super.key});  @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Goyo',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF2E7D32)),
         useMaterial3: true,
+        // Configuración específica para Flutter Web
+        focusColor: Colors.transparent,
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
       ),
-      home: const SplashScreen(),
+      home: const FlutterWebWrapper(child: SplashScreen()),
       debugShowCheckedModeBanner: false,
-      routes: {
-        '/login': (context) => const LoginScreen(),
+      // Configuración de navegación para Flutter Web
+      builder: (context, child) {
+        if (kIsWeb) {
+          // Wrapper específico para Flutter Web
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(1.0), // Forzar escala de texto fija
+            ),
+            child: child!,
+          );
+        }
+        return child!;
+      },      routes: {
+        '/login': (context) => const FlutterWebWrapper(child: LoginScreen()),
       },
     );
   }

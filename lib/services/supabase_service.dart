@@ -43,9 +43,7 @@ class SupabaseService {
       print('Error uploading image bytes: $e');
       return null;
     }
-  }
-  
-  // Registrar animal en la base de datos
+  }  // Registrar animal en la base de datos
   static Future<Map<String, dynamic>?> registerAnimal({
     required String nombre,
     required String correo,
@@ -58,21 +56,34 @@ class SupabaseService {
     String? fotoUrl,
   }) async {
     try {
-      final response = await client.from('animales').insert({
+      print('📤 Preparando datos para insertar animal...');
+      
+      final insertData = {
         'nombre': nombre,
         'correo': correo,
-        'contraseña': password,
+        'contraseña': password, // Se encriptará automáticamente por el trigger
         'ubicacion': ubicacion,
         'tipo': tipo,
         'raza': raza,
         'edad': edad,
         'altura': altura,
         'foto_url': fotoUrl,
-      }).select().single();
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
       
+      print('📤 Enviando datos a Supabase: $insertData');
+      
+      final response = await client.from('animales').insert(insertData).select().single();
+      
+      print('✅ Animal registrado exitosamente: $response');
       return response;
     } catch (e) {
-      print('Error registering animal: $e');
+      print('🚨 ERROR registrando animal: $e');
+      if (e.toString().contains('42501')) {
+        print('🚨 ERROR RLS: Problema con Row Level Security');
+        print('💡 SOLUCIÓN: Ejecutar script de corrección RLS en Supabase');
+      }
       return null;
     }
   }
