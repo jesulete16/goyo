@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login.dart';
 import 'cita_calendar.dart';
+import 'perfil_animal.dart';
 
 class MenuAnimal extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -49,18 +50,67 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
     _animationController.dispose();
     _tabController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadVeterinarios() async {
+  }  Future<void> _loadVeterinarios() async {
     try {
       print('🔍 Cargando veterinarios...');
       
-      final response = await Supabase.instance.client
-          .from('veterinarios')
-          .select('id, nombre, correo, ubicacion, especialidad, años_experiencia, telefono, foto_url, numero_colegiado')
-          .order('nombre');
+      // Obtener el tipo del animal actual
+      String tipoAnimal = widget.userData['tipo']?.toString() ?? '';
+      print('🐾 Tipo del animal original: "$tipoAnimal"');
       
-      print('📋 Veterinarios encontrados: ${response.length}');
+      // Capitalizar primera letra para coincidir con la BD
+      String tipoAnimalCapitalizado = tipoAnimal.isNotEmpty 
+          ? tipoAnimal[0].toUpperCase() + tipoAnimal.substring(1).toLowerCase()
+          : '';
+      print('🐾 Tipo del animal capitalizado: "$tipoAnimalCapitalizado"');
+      print('📋 Datos completos del animal: ${widget.userData}');
+      
+      // Primero, cargar TODOS los veterinarios para ver qué especialidades existen
+      final todosVeterinarios = await Supabase.instance.client
+          .from('veterinarios')
+          .select('id, nombre, especialidad');
+      
+      print('🔍 TODOS los veterinarios en BD:');
+      for (var vet in todosVeterinarios) {
+        print('   - ${vet['nombre']}: especialidad = "${vet['especialidad']}"');
+      }
+      
+      // Ahora aplicar el filtro con la capitalización correcta
+      var query = Supabase.instance.client
+          .from('veterinarios')
+          .select('id, nombre, correo, ubicacion, especialidad, años_experiencia, telefono, foto_url, numero_colegiado');
+      
+      List<dynamic> response;
+      
+      if (tipoAnimalCapitalizado.isNotEmpty) {
+        print('🔍 Aplicando filtro para tipo: "$tipoAnimalCapitalizado"');
+        // Usar filtro OR con capitalización correcta
+        try {
+          response = await query.or('especialidad.eq.General,especialidad.eq.$tipoAnimalCapitalizado').order('nombre');
+          print('✅ Filtro OR funcionó: ${response.length} veterinarios');
+        } catch (e) {
+          print('❌ Error con filtro OR: $e');
+          // Si falla, intentar con filtro manual
+          final todosVets = await Supabase.instance.client
+              .from('veterinarios')
+              .select('id, nombre, correo, ubicacion, especialidad, años_experiencia, telefono, foto_url, numero_colegiado')
+              .order('nombre');
+          
+          response = todosVets.where((vet) => 
+            vet['especialidad']?.toString() == 'General' || 
+            vet['especialidad']?.toString() == tipoAnimalCapitalizado
+          ).toList();
+          print('✅ Filtro manual aplicado: ${response.length} veterinarios');
+        }
+      } else {
+        print('⚠️ Sin tipo de animal, mostrando solo generales');
+        response = await query.eq('especialidad', 'General').order('nombre');
+      }
+      
+      print('📋 Veterinarios filtrados para "$tipoAnimalCapitalizado": ${response.length}');
+      for (var vet in response) {
+        print('   ✅ ${vet['nombre']}: especialidad = "${vet['especialidad']}"');
+      }
       
       setState(() {
         veterinarios = List<Map<String, dynamic>>.from(response);
@@ -176,12 +226,88 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
     );
   }
 
+  void _abrirPerfil() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PerfilAnimal(
+          userData: widget.userData,
+          onUserDataUpdated: (Map<String, dynamic> nuevosUserData) {
+            // Actualizar los datos del usuario en el estado local
+            setState(() {
+              // No podemos modificar widget.userData directamente, 
+              // pero podemos actualizar campos específicos si es necesario
+            });
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
+    final fotoPerfil = widget.userData['foto_url'];
+    final tipoAnimal = widget.userData['tipo']?.toString() ?? '';
     
     return Scaffold(
       backgroundColor: const Color(0xFF0D2818),
+      drawer: Drawer(
+        backgroundColor: const Color(0xFF1B5E20),
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 38,
+                    backgroundColor: Colors.greenAccent.withOpacity(0.2),
+                    backgroundImage: fotoPerfil != null && fotoPerfil.isNotEmpty ? NetworkImage(fotoPerfil) : null,
+                    child: (fotoPerfil == null || fotoPerfil.isEmpty)
+                        ? const Icon(Icons.pets, color: Colors.greenAccent, size: 40)
+                        : null,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.userData['nombre'] ?? '',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  Text(
+                    tipoAnimal.isNotEmpty ? tipoAnimal : 'Animal',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),            ListTile(
+              leading: const Icon(Icons.home, color: Colors.greenAccent),
+              title: const Text('Inicio', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.pets, color: Colors.blueAccent),
+              title: const Text('Mi Perfil', style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _abrirPerfil();
+              },
+            ),
+            const Divider(color: Colors.white30),
+            ListTile(
+              leading: const Icon(Icons.logout, color: Colors.redAccent),
+              title: const Text('Cerrar Sesión', style: TextStyle(color: Colors.white)),
+              onTap: _logout,
+            ),
+          ],
+        ),
+      ),
       body: Container(
         width: double.infinity,
         height: double.infinity,
@@ -202,52 +328,63 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           child: FadeTransition(
             opacity: _fadeAnimation,
             child: Column(
-              children: [
-                // Header con información del animal
+              children: [                // Header profesional
                 Container(
-                  padding: EdgeInsets.all(isDesktop ? 20 : 16),
+                  padding: EdgeInsets.all(isDesktop ? 20 : 12),
+                  margin: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 8, vertical: isDesktop ? 12 : 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    border: Border(
-                      bottom: BorderSide(
-                        color: Colors.white.withOpacity(0.2),
-                        width: 1,
+                    color: Colors.white.withOpacity(0.13),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.10),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
                       ),
-                    ),
+                    ],
                   ),
                   child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: isDesktop ? 25 : 20,
-                        backgroundColor: Colors.greenAccent.withOpacity(0.2),
-                        child: Icon(
-                          Icons.pets,
-                          color: Colors.greenAccent,
-                          size: isDesktop ? 30 : 24,
-                        ),
+                    children: [                      CircleAvatar(
+                        radius: isDesktop ? 24 : 20,
+                        backgroundColor: Colors.greenAccent.withOpacity(0.18),
+                        backgroundImage: fotoPerfil != null && fotoPerfil.isNotEmpty ? NetworkImage(fotoPerfil) : null,
+                        child: (fotoPerfil == null || fotoPerfil.isEmpty)
+                            ? Icon(Icons.pets, color: Colors.greenAccent, size: isDesktop ? 24 : 18)
+                            : null,
                       ),
-                      SizedBox(width: isDesktop ? 16 : 12),
+                      SizedBox(width: isDesktop ? 16 : 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Hola, ${widget.userData['nombre']}!',
+                          children: [                            Text(
+                              '¡Hola, ${widget.userData['nombre']}!',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: isDesktop ? 22 : 18,
+                                fontSize: isDesktop ? 20 : 16,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
                               ),
                             ),
-                            Text(
-                              'Gestiona tus citas veterinarias',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: isDesktop ? 14 : 12,
-                              ),
-                            ),
+                            Row(
+                              children: [
+                                Icon(Icons.pets, color: Colors.greenAccent, size: isDesktop ? 14 : 12),
+                                const SizedBox(width: 4),
+                                Text(
+                                  tipoAnimal.isNotEmpty ? tipoAnimal : 'Animal',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: isDesktop ? 12 : 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],                            ),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        onPressed: _abrirPerfil,
+                        icon: const Icon(Icons.edit, color: Colors.white70),
+                        tooltip: 'Editar Perfil',
                       ),
                       IconButton(
                         onPressed: _logout,
@@ -257,32 +394,30 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                
-                // TabBar
+                  // TabBar
                 Container(
                   margin: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 20 : 16,
-                    vertical: isDesktop ? 20 : 16,
+                    horizontal: isDesktop ? 16 : 12,
+                    vertical: isDesktop ? 12 : 8,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: Colors.white.withOpacity(0.2),
                       width: 1,
                     ),
                   ),
                   child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(
+                    controller: _tabController,                    indicator: BoxDecoration(
                       color: Colors.greenAccent,
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     labelColor: Colors.black,
                     unselectedLabelColor: Colors.white70,
                     labelStyle: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: isDesktop ? 16 : 14,
+                      fontSize: isDesktop ? 14 : 12,
                     ),
                     tabs: const [
                       Tab(
@@ -315,32 +450,36 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         ),
       ),
     );
-  }
-
-  Widget _buildVeterinariosTab(bool isDesktop) {
+  }  Widget _buildVeterinariosTab(bool isDesktop) {
+    // Obtener el tipo del animal para el título
+    String tipoAnimal = widget.userData['tipo']?.toString() ?? '';
+    String tituloVeterinarios = tipoAnimal.isNotEmpty 
+        ? 'Veterinarios para ${tipoAnimal.toLowerCase()}s'
+        : 'Veterinarios Disponibles';
+    
     return Column(
-      children: [
-        // Título de veterinarios
+      children: [        // Título de veterinarios
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 12),
           child: Row(
             children: [
               const Icon(
                 Icons.medical_services,
                 color: Colors.greenAccent,
-                size: 28,
+                size: 20,
               ),
-              const SizedBox(width: 12),
-              Text(
-                'Veterinarios Disponibles',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isDesktop ? 24 : 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  tituloVeterinarios,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isDesktop ? 18 : 16,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
                 ),
               ),
-              const Spacer(),
               if (!isLoading)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -371,25 +510,24 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
 
   Widget _buildMisCitasTab(bool isDesktop) {
     return Column(
-      children: [
-        // Título de mis citas
+      children: [        // Título de mis citas
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 12),
           child: Row(
             children: [
               const Icon(
                 Icons.calendar_today,
                 color: Colors.blueAccent,
-                size: 28,
+                size: 20,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Text(
                 'Mis Citas',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: isDesktop ? 24 : 20,
+                  fontSize: isDesktop ? 18 : 16,
                   fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
+                  letterSpacing: 0.8,
                 ),
               ),
               const Spacer(),
@@ -493,14 +631,12 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
 
     return RefreshIndicator(
       onRefresh: _loadVeterinarios,
-      color: Colors.greenAccent,
-      child: GridView.builder(
-        padding: EdgeInsets.all(isDesktop ? 20 : 16),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isDesktop ? 3 : (MediaQuery.of(context).size.width > 600 ? 2 : 1),
-          childAspectRatio: isDesktop ? 1.1 : 1.2,
-          crossAxisSpacing: isDesktop ? 20 : 12,
-          mainAxisSpacing: isDesktop ? 20 : 12,
+      color: Colors.greenAccent,      child: GridView.builder(
+        padding: EdgeInsets.all(isDesktop ? 16 : 12),        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isDesktop ? 4 : (MediaQuery.of(context).size.width > 600 ? 3 : 2),
+          childAspectRatio: isDesktop ? 0.85 : 0.95,
+          crossAxisSpacing: isDesktop ? 12 : 8,
+          mainAxisSpacing: isDesktop ? 12 : 8,
         ),
         itemCount: veterinarios.length,
         itemBuilder: (context, index) {
@@ -563,9 +699,8 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
 
     return RefreshIndicator(
       onRefresh: _loadMisCitas,
-      color: Colors.blueAccent,
-      child: ListView.builder(
-        padding: EdgeInsets.all(isDesktop ? 20 : 16),
+      color: Colors.blueAccent,      child: ListView.builder(
+        padding: EdgeInsets.all(isDesktop ? 16 : 12),
         itemCount: misCitas.length,
         itemBuilder: (context, index) {
           final cita = misCitas[index];
@@ -580,37 +715,35 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       cursor: SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(isDesktop ? 24 : 16),
+        curve: Curves.easeInOut,        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(isDesktop ? 14 : 10),
           border: Border.all(
             color: Colors.greenAccent.withOpacity(0.25),
-            width: 2,
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.13),
-              blurRadius: isDesktop ? 28 : 18,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: isDesktop ? 12 : 8,
+              offset: const Offset(0, 3),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(isDesktop ? 24 : 16),
+          borderRadius: BorderRadius.circular(isDesktop ? 14 : 10),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
             child: Padding(
-              padding: EdgeInsets.all(isDesktop ? 22 : 14),
+              padding: EdgeInsets.all(isDesktop ? 12 : 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Header con foto y nombre
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        radius: isDesktop ? 34 : 26,
+                    children: [                      CircleAvatar(
+                        radius: isDesktop ? 20 : 16,
                         backgroundColor: Colors.greenAccent.withOpacity(0.18),
                         backgroundImage: veterinario['foto_url'] != null
                             ? NetworkImage(veterinario['foto_url'])
@@ -619,11 +752,11 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                             ? Icon(
                                 Icons.person,
                                 color: Colors.greenAccent,
-                                size: isDesktop ? 38 : 28,
+                                size: isDesktop ? 22 : 18,
                               )
                             : null,
                       ),
-                      SizedBox(width: isDesktop ? 16 : 10),
+                      SizedBox(width: isDesktop ? 8 : 6),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,14 +765,13 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                               children: [
                                 Flexible(
                                   child: Text(
-                                    veterinario['nombre'] ?? 'Sin nombre',
-                                    style: TextStyle(
+                                    veterinario['nombre'] ?? 'Sin nombre',                                    style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: isDesktop ? 18 : 15,
+                                      fontSize: isDesktop ? 13 : 11,
                                       fontWeight: FontWeight.bold,
-                                      letterSpacing: 0.5,
+                                      letterSpacing: 0.3,
                                     ),
-                                    maxLines: 2,
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
@@ -654,22 +786,20 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                            Container(                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.greenAccent.withOpacity(0.22),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.medical_services, color: Colors.greenAccent, size: isDesktop ? 15 : 12),
-                                  const SizedBox(width: 4),
+                                children: [                                  Icon(Icons.medical_services, color: Colors.greenAccent, size: isDesktop ? 10 : 8),
+                                  const SizedBox(width: 2),
                                   Text(
                                     veterinario['especialidad'] ?? 'General',
                                     style: TextStyle(
                                       color: Colors.greenAccent,
-                                      fontSize: isDesktop ? 13 : 11,
+                                      fontSize: isDesktop ? 9 : 7,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -680,15 +810,12 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 14),
+                  ),                  const SizedBox(height: 6),
                   // Información del veterinario
                   _buildInfoRow(Icons.location_on, veterinario['ubicacion'], isDesktop),
-                  SizedBox(height: isDesktop ? 8 : 6),
-                  _buildInfoRow(Icons.star, '${veterinario['años_experiencia'] ?? 0} años de experiencia', isDesktop),
-                  SizedBox(height: isDesktop ? 8 : 6),
-                  _buildInfoRow(Icons.badge, veterinario['numero_colegiado'], isDesktop),
-                  SizedBox(height: isDesktop ? 8 : 6),
+                  SizedBox(height: isDesktop ? 3 : 2),
+                  _buildInfoRow(Icons.star, '${veterinario['años_experiencia'] ?? 0} años', isDesktop),
+                  SizedBox(height: isDesktop ? 3 : 2),
                   _buildInfoRow(Icons.phone, veterinario['telefono'], isDesktop),
                   const Spacer(),
                   // Botón pedir cita
@@ -698,20 +825,17 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                       onPressed: () => _pedirCita(veterinario),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.greenAccent,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(isDesktop ? 14 : 10),
-                        ),
-                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 13 : 10),
-                        elevation: 6,
-                        shadowColor: Colors.greenAccent.withOpacity(0.18),
+                        foregroundColor: Colors.black,                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(isDesktop ? 10 : 8),
+                        ),                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 6),
+                        elevation: 3,
+                        shadowColor: Colors.greenAccent.withOpacity(0.12),
                         textStyle: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 15 : 12,
+                          fontSize: isDesktop ? 11 : 9,
                         ),
-                      ),
-                      icon: const Icon(Icons.calendar_month, size: 18),
-                      label: const Text('Pedir Cita'),
+                      ),                      icon: const Icon(Icons.calendar_month, size: 14),
+                      label: const Text('Cita'),
                     ),
                   ),
                 ],
@@ -753,55 +877,51 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       default:
         estadoColor = Colors.grey;
         estadoIcon = Icons.help;
-    }
-
-    return Container(
-      margin: EdgeInsets.only(bottom: isDesktop ? 16 : 12),      decoration: BoxDecoration(
+    }    return Container(
+      margin: EdgeInsets.only(bottom: isDesktop ? 12 : 8),      decoration: BoxDecoration(
         color: estadoColor.withOpacity(0.1), // Fondo con tinte del color del estado
-        borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
+        borderRadius: BorderRadius.circular(isDesktop ? 16 : 12),
         border: Border.all(
           color: estadoColor.withOpacity(0.5), // Borde más visible
-          width: 2,
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: isDesktop ? 20 : 15,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: isDesktop ? 15 : 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
+        borderRadius: BorderRadius.circular(isDesktop ? 16 : 12),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Padding(
-            padding: EdgeInsets.all(isDesktop ? 20 : 16),
+            padding: EdgeInsets.all(isDesktop ? 16 : 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header de la cita
                 Row(
-                  children: [
-                    CircleAvatar(
-                      radius: isDesktop ? 25 : 20,
+                  children: [                    CircleAvatar(
+                      radius: isDesktop ? 20 : 16,
                       backgroundColor: estadoColor.withOpacity(0.2),
                       child: Icon(
                         estadoIcon,
                         color: estadoColor,
-                        size: isDesktop ? 28 : 22,
+                        size: isDesktop ? 22 : 18,
                       ),
                     ),
-                    SizedBox(width: isDesktop ? 16 : 12),
+                    SizedBox(width: isDesktop ? 12 : 8),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
+                        children: [                          Text(
                             'Dr. ${veterinario?['nombre'] ?? 'Sin nombre'}',
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isDesktop ? 18 : 16,
+                              fontSize: isDesktop ? 15 : 13,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -809,24 +929,23 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                             veterinario?['especialidad'] ?? 'General',
                             style: TextStyle(
                               color: Colors.white70,
-                              fontSize: isDesktop ? 14 : 12,
+                              fontSize: isDesktop ? 12 : 10,
                             ),
                           ),
                         ],
                       ),
-                    ),                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktop ? 16 : 12, 
-                        vertical: isDesktop ? 8 : 6
+                    ),                    Container(                      padding: EdgeInsets.symmetric(
+                        horizontal: isDesktop ? 12 : 8, 
+                        vertical: isDesktop ? 6 : 4
                       ),
                       decoration: BoxDecoration(
                         color: estadoColor, // Fondo sólido del color del estado
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
-                            color: estadoColor.withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                            color: estadoColor.withOpacity(0.25),
+                            blurRadius: 3,
+                            offset: const Offset(0, 1),
                           ),
                         ],
                       ),
@@ -836,32 +955,31 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                           Icon(
                             estadoIcon,
                             color: Colors.white,
-                            size: isDesktop ? 16 : 14,
+                            size: isDesktop ? 12 : 10,
                           ),
-                          SizedBox(width: isDesktop ? 6 : 4),
+                          SizedBox(width: isDesktop ? 4 : 2),
                           Text(
                             estado.toUpperCase(),
                             style: TextStyle(
                               color: Colors.white,
-                              fontSize: isDesktop ? 12 : 10,
+                              fontSize: isDesktop ? 10 : 8,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ],
-                ),
-                
-                SizedBox(height: isDesktop ? 16 : 12),
+                ),                
+                SizedBox(height: isDesktop ? 12 : 8),
                 
                 // Información de la cita
                 Container(
-                  padding: EdgeInsets.all(isDesktop ? 16 : 12),
+                  padding: EdgeInsets.all(isDesktop ? 12 : 8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
+                    color: Colors.white.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
                     children: [
@@ -885,8 +1003,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                             ),
                           ),
                         ],
-                      ),
-                      SizedBox(height: isDesktop ? 12 : 8),
+                      ),                      SizedBox(height: isDesktop ? 8 : 6),
                       Row(
                         children: [
                           Expanded(
@@ -897,7 +1014,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                               isDesktop,
                             ),
                           ),
-                          SizedBox(width: isDesktop ? 16 : 12),
+                          SizedBox(width: isDesktop ? 12 : 8),
                           Expanded(
                             child: _buildCitaInfoItem(
                               Icons.euro,
@@ -911,10 +1028,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                     ],
                   ),
                 ),
-                
-                // Botones de acción (solo para citas programadas)
+                  // Botones de acción (solo para citas programadas)
                 if (estado == 'programada') ...[
-                  SizedBox(height: isDesktop ? 16 : 12),
+                  SizedBox(height: isDesktop ? 12 : 8),
                   Row(
                     children: [
                       Expanded(
@@ -922,10 +1038,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                           onPressed: () => _cancelarCita(cita['id']),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Colors.redAccent),
-                            foregroundColor: Colors.redAccent,
-                            padding: EdgeInsets.symmetric(vertical: isDesktop ? 12 : 10),
+                            foregroundColor: Colors.redAccent,                            padding: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 6),
                           ),
-                          icon: const Icon(Icons.cancel, size: 18),
+                          icon: const Icon(Icons.cancel, size: 14),
                           label: const Text('Cancelar'),
                         ),
                       ),
@@ -937,8 +1052,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                             backgroundColor: Colors.blueAccent,
                             foregroundColor: Colors.white,
                             padding: EdgeInsets.symmetric(vertical: isDesktop ? 12 : 10),
-                          ),
-                          icon: const Icon(Icons.phone, size: 18),
+                          ),                          icon: const Icon(Icons.phone, size: 18),
                           label: const Text('Contactar'),
                         ),
                       ),
@@ -960,27 +1074,25 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         Row(
           children: [
             Icon(
-              icon,
+              icon,            color: Colors.white70,
+            size: isDesktop ? 12 : 10,
+          ),
+          SizedBox(width: isDesktop ? 6 : 4),
+          Text(
+            label,
+            style: TextStyle(
               color: Colors.white70,
-              size: isDesktop ? 16 : 14,
+              fontSize: isDesktop ? 10 : 8,
+              fontWeight: FontWeight.w500,
             ),
-            SizedBox(width: isDesktop ? 8 : 6),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white70,
-                fontSize: isDesktop ? 12 : 10,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+          ),
           ],
-        ),
-        SizedBox(height: isDesktop ? 6 : 4),
+        ),        SizedBox(height: isDesktop ? 4 : 3),
         Text(
           value,
           style: TextStyle(
             color: Colors.white,
-            fontSize: isDesktop ? 14 : 12,
+            fontSize: isDesktop ? 12 : 10,
             fontWeight: FontWeight.bold,
           ),
           maxLines: 2,
@@ -1109,19 +1221,18 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
 
   Widget _buildInfoRow(IconData icon, String? text, bool isDesktop) {
     return Row(
-      children: [
-        Icon(
+      children: [        Icon(
           icon,
           color: Colors.white70,
-          size: isDesktop ? 16 : 14,
+          size: isDesktop ? 10 : 8,
         ),
-        SizedBox(width: isDesktop ? 8 : 6),
+        SizedBox(width: isDesktop ? 4 : 3),
         Expanded(
           child: Text(
             text ?? 'No disponible',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: isDesktop ? 13 : 11,
+              fontSize: isDesktop ? 9 : 7,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

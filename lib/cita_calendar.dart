@@ -46,16 +46,15 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
     {'motivo': 'Consulta especializada', 'precio': 70.00, 'icono': Icons.psychology},
     {'motivo': 'Análisis clínicos', 'precio': 50.00, 'icono': Icons.biotech},
   ];
-
-  // Horarios fijos del veterinario (9:00-13:30 y 17:00-20:30)
+  // Horarios fijos del veterinario (9:00-13:00 y 17:00-20:00)
   final List<String> horarioManana = [
     '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30'
+    '12:00', '12:30', '13:00'
   ];
   
   final List<String> horarioTarde = [
     '17:00', '17:30', '18:00', '18:30', '19:00', '19:30',
-    '20:00', '20:30'
+    '20:00'
   ];
 
   @override
