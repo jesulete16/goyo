@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'login.dart';
 
 class MenuVeterinario extends StatefulWidget {
@@ -22,11 +23,13 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
   String? _errorMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
+    
+    // Inicializar localización para fechas en español
+    initializeDateFormatting('es_ES', null);
     
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -374,15 +377,13 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
             offset: const Offset(0, 4),
           ),
         ],
-      ),
-      child: TableCalendar<Map<String, dynamic>>(
+      ),      child: TableCalendar<Map<String, dynamic>>(
         firstDay: DateTime.utc(2020, 1, 1),
         lastDay: DateTime.utc(2030, 12, 31),
         focusedDay: _focusedDay,
         selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
         eventLoader: _getCitasDelDia,
         startingDayOfWeek: StartingDayOfWeek.monday,
-        locale: 'es_ES',
         calendarStyle: CalendarStyle(
           // Días normales
           defaultTextStyle: const TextStyle(color: Colors.white),
