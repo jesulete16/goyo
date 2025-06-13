@@ -167,6 +167,146 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
     );
   }
 
+  Future<void> _actualizarEstadoCita(int citaId, String nuevoEstado) async {
+    try {
+      print('🔄 Actualizando cita $citaId a estado: $nuevoEstado');
+      
+      final response = await Supabase.instance.client
+          .from('citas')
+          .update({'estado': nuevoEstado})
+          .eq('id', citaId)
+          .select();
+      
+      if (response.isNotEmpty) {
+        print('✅ Cita actualizada exitosamente');
+        // Recargar las citas para mostrar el cambio
+        await _loadCitasVeterinario();
+        
+        // Mostrar mensaje de confirmación
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(
+                    nuevoEstado == 'completada' ? Icons.check_circle : Icons.cancel,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    nuevoEstado == 'completada' 
+                        ? 'Cita marcada como completada' 
+                        : 'Cita cancelada',
+                  ),
+                ],
+              ),
+              backgroundColor: nuevoEstado == 'completada' 
+                  ? Colors.green 
+                  : Colors.red,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('🚨 Error actualizando cita: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error, color: Colors.white),
+                const SizedBox(width: 8),
+                Text('Error al actualizar cita: ${e.toString()}'),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _mostrarConfirmacionEstado(Map<String, dynamic> cita, String nuevoEstado) {
+    final isCompletar = nuevoEstado == 'completada';
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1B5E20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(
+                isCompletar ? Icons.check_circle : Icons.cancel,
+                color: isCompletar ? Colors.greenAccent : Colors.redAccent,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                isCompletar ? 'Completar Cita' : 'Cancelar Cita',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '¿Estás seguro de que quieres ${isCompletar ? "marcar como completada" : "cancelar"} la cita?',
+                style: const TextStyle(color: Colors.white70),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${cita['hora_inicio']} - ${cita['hora_fin']}',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'Animal: ${cita['animales']?['nombre'] ?? 'Sin nombre'}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    Text(
+                      'Motivo: ${cita['motivo'] ?? 'Consulta general'}',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _actualizarEstadoCita(cita['id'], nuevoEstado);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isCompletar ? Colors.greenAccent : Colors.redAccent,
+                foregroundColor: Colors.black,
+              ),
+              child: Text(isCompletar ? 'Completar' : 'Cancelar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
@@ -679,8 +819,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                     ),
                   ],
                 ),
-                SizedBox(height: isDesktop ? 8 : 6),
-                _buildInfoItem(
+                SizedBox(height: isDesktop ? 8 : 6),                _buildInfoItem(
                   Icons.notes,
                   'Motivo',
                   cita['motivo'] ?? 'Consulta general',
@@ -690,6 +829,58 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
               ],
             ),
           ),
+          
+          // Botones de acción (solo para citas programadas o confirmadas)
+          if (estado == 'programada' || estado == 'confirmada') ...[
+            SizedBox(height: isDesktop ? 12 : 8),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _mostrarConfirmacionEstado(cita, 'completada'),
+                    icon: const Icon(Icons.check_circle, size: 18),
+                    label: Text(
+                      'Completar',
+                      style: TextStyle(fontSize: isDesktop ? 12 : 10),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.greenAccent,
+                      foregroundColor: Colors.black,
+                      padding: EdgeInsets.symmetric(
+                        vertical: isDesktop ? 8 : 6,
+                        horizontal: isDesktop ? 12 : 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: isDesktop ? 8 : 6),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _mostrarConfirmacionEstado(cita, 'cancelada'),
+                    icon: const Icon(Icons.cancel, size: 18),
+                    label: Text(
+                      'Cancelar',
+                      style: TextStyle(fontSize: isDesktop ? 12 : 10),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        vertical: isDesktop ? 8 : 6,
+                        horizontal: isDesktop ? 12 : 8,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
