@@ -19,10 +19,10 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
   bool isLoading = true;
   bool isLoadingCitas = false;
   String? errorMessage;
+  int selectedTabIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late TabController _tabController;
-
   @override
   void initState() {
     super.initState();
@@ -38,12 +38,10 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
-    _loadVeterinarios();
+      _loadVeterinarios();
     _loadMisCitas();
     _animationController.forward();
   }
-
   @override
   void dispose() {
     _animationController.dispose();
@@ -57,7 +55,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       
       final response = await Supabase.instance.client
           .from('veterinarios')
-          .select('id, nombre, correo, ubicacion, especialidad, años_experiencia, telefono, foto_url, numero_colegiado')
+          .select('nombre, correo, ubicacion, especialidad, años_experiencia, telefono, foto_url, numero_colegiado')
           .order('nombre');
       
       print('📋 Veterinarios encontrados: ${response.length}');
@@ -74,8 +72,8 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         errorMessage = 'Error al cargar veterinarios: ${e.toString()}';
       });
     }
-  }
-
+  }  
+  
   Future<void> _loadMisCitas() async {
     setState(() => isLoadingCitas = true);
     
@@ -118,7 +116,6 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       });
     }
   }
-
   void _pedirCita(Map<String, dynamic> veterinario) {
     showDialog(
       context: context,
@@ -172,8 +169,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
             ),
           ],
         );
-      },
-    );
+      },    );
   }
 
   @override
@@ -240,7 +236,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                               ),
                             ),
                             Text(
-                              'Gestiona tus citas veterinarias',
+                              'Encuentra tu veterinario ideal',
                               style: TextStyle(
                                 color: Colors.white70,
                                 fontSize: isDesktop ? 14 : 12,
@@ -256,14 +252,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                       ),
                     ],
                   ),
-                ),
-                
-                // TabBar
+                ),                // TabBar
                 Container(
-                  margin: EdgeInsets.symmetric(
-                    horizontal: isDesktop ? 20 : 16,
-                    vertical: isDesktop ? 20 : 16,
-                  ),
+                  margin: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(16),
@@ -284,18 +275,20 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                       fontWeight: FontWeight.bold,
                       fontSize: isDesktop ? 16 : 14,
                     ),
-                    tabs: const [
+                    tabs: [
                       Tab(
-                        icon: Icon(Icons.medical_services),
+                        icon: const Icon(Icons.medical_services),
                         text: 'Veterinarios',
                       ),
                       Tab(
-                        icon: Icon(Icons.calendar_today),
+                        icon: const Icon(Icons.calendar_today),
                         text: 'Mis Citas',
                       ),
                     ],
                   ),
                 ),
+                
+                const SizedBox(height: 20),
                 
                 // TabBarView content
                 Expanded(
@@ -303,9 +296,57 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                     controller: _tabController,
                     children: [
                       // Pestaña de Veterinarios
-                      _buildVeterinariosTab(isDesktop),
+                      Column(
+                        children: [
+                          // Título de veterinarios
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.medical_services,
+                                  color: Colors.greenAccent,
+                                  size: 28,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Veterinarios Disponibles',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: isDesktop ? 24 : 20,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                                const Spacer(),
+                                if (!isLoading)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.greenAccent.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      '${veterinarios.length} disponibles',
+                                      style: const TextStyle(
+                                        color: Colors.greenAccent,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          // Lista de veterinarios
+                          Expanded(
+                            child: _buildVeterinariosContent(isDesktop),
+                          ),
+                        ],
+                      ),
                       // Pestaña de Mis Citas
-                      _buildMisCitasTab(isDesktop),
+                      _buildMisCitasContent(isDesktop),
                     ],
                   ),
                 ),
@@ -314,110 +355,6 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildVeterinariosTab(bool isDesktop) {
-    return Column(
-      children: [
-        // Título de veterinarios
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.medical_services,
-                color: Colors.greenAccent,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Veterinarios Disponibles',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isDesktop ? 24 : 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const Spacer(),
-              if (!isLoading)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.greenAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${veterinarios.length} disponibles',
-                    style: const TextStyle(
-                      color: Colors.greenAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Lista de veterinarios
-        Expanded(
-          child: _buildVeterinariosContent(isDesktop),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMisCitasTab(bool isDesktop) {
-    return Column(
-      children: [
-        // Título de mis citas
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.calendar_today,
-                color: Colors.blueAccent,
-                size: 28,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'Mis Citas',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isDesktop ? 24 : 20,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const Spacer(),
-              if (!isLoadingCitas)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    '${misCitas.length} citas',
-                    style: const TextStyle(
-                      color: Colors.blueAccent,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        // Lista de citas
-        Expanded(
-          child: _buildCitasContent(isDesktop),
-        ),
-      ],
     );
   }
 
@@ -489,9 +426,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           ],
         ),
       );
-    }
-
-    return RefreshIndicator(
+    }    return RefreshIndicator(
       onRefresh: _loadVeterinarios,
       color: Colors.greenAccent,
       child: GridView.builder(
@@ -506,70 +441,6 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         itemBuilder: (context, index) {
           final veterinario = veterinarios[index];
           return _buildVeterinarioCard(veterinario, isDesktop);
-        },
-      ),
-    );
-  }
-
-  Widget _buildCitasContent(bool isDesktop) {
-    if (isLoadingCitas) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(color: Colors.blueAccent),
-            SizedBox(height: 16),
-            Text(
-              'Cargando citas...',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (misCitas.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.event_busy, color: Colors.white54, size: 64),
-            const SizedBox(height: 16),
-            const Text(
-              'No tienes citas programadas',
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Agenda una cita con un veterinario',
-              style: TextStyle(color: Colors.white54, fontSize: 14),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () {
-                _tabController.animateTo(0); // Ir a la pestaña de veterinarios
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.greenAccent,
-                foregroundColor: Colors.black,
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text('Agendar Cita'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: _loadMisCitas,
-      color: Colors.blueAccent,
-      child: ListView.builder(
-        padding: EdgeInsets.all(isDesktop ? 20 : 16),
-        itemCount: misCitas.length,
-        itemBuilder: (context, index) {
-          final cita = misCitas[index];
-          return _buildCitaCard(cita, isDesktop);
         },
       ),
     );
@@ -690,8 +561,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                   _buildInfoRow(Icons.badge, veterinario['numero_colegiado'], isDesktop),
                   SizedBox(height: isDesktop ? 8 : 6),
                   _buildInfoRow(Icons.phone, veterinario['telefono'], isDesktop),
-                  const Spacer(),
-                  // Botón pedir cita
+                  const Spacer(),                  // Botón pedir cita
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -719,6 +589,145 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
             ),
           ),
         ),
+      );
+  }
+
+  Widget _buildInfoRow(IconData icon, String? text, bool isDesktop) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          color: Colors.white70,
+          size: isDesktop ? 16 : 14,
+        ),
+        SizedBox(width: isDesktop ? 8 : 6),
+        Expanded(
+          child: Text(
+            text ?? 'No disponible',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: isDesktop ? 13 : 11,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMisCitasContent(bool isDesktop) {
+    return Column(
+      children: [
+        // Título de mis citas
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 16),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.calendar_today,
+                color: Colors.greenAccent,
+                size: 28,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Mis Citas',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: isDesktop ? 24 : 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              if (!isLoadingCitas)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${misCitas.length} citas',
+                    style: const TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Lista de citas
+        Expanded(
+          child: _buildCitasListContent(isDesktop),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCitasListContent(bool isDesktop) {
+    if (isLoadingCitas) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.blueAccent),
+            SizedBox(height: 16),
+            Text(
+              'Cargando citas...',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (misCitas.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.event_busy, color: Colors.white54, size: 64),
+            const SizedBox(height: 16),
+            const Text(
+              'No tienes citas programadas',
+              style: TextStyle(color: Colors.white70, fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Agenda una cita con un veterinario',
+              style: TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                _tabController.animateTo(0); // Ir a la pestaña de veterinarios
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.greenAccent,
+                foregroundColor: Colors.black,
+              ),
+              icon: const Icon(Icons.add),
+              label: const Text('Agendar Cita'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadMisCitas,
+      color: Colors.blueAccent,
+      child: ListView.builder(
+        padding: EdgeInsets.all(isDesktop ? 20 : 16),
+        itemCount: misCitas.length,
+        itemBuilder: (context, index) {
+          final cita = misCitas[index];
+          return _buildCitaCard(cita, isDesktop);
+        },
       ),
     );
   }
@@ -926,8 +935,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildCitaInfoItem(IconData icon, String label, String value, bool isDesktop) {
@@ -1050,11 +1058,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
             children: [
               const Icon(Icons.phone, color: Colors.blueAccent),
               const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Contactar Dr. ${veterinario['nombre']}',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                ),
+              Text(
+                'Contactar Dr. ${veterinario['nombre']}',
+                style: const TextStyle(color: Colors.white, fontSize: 16),
               ),
             ],
           ),
@@ -1081,30 +1087,6 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String? text, bool isDesktop) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: Colors.white70,
-          size: isDesktop ? 16 : 14,
-        ),
-        SizedBox(width: isDesktop ? 8 : 6),
-        Expanded(
-          child: Text(
-            text ?? 'No disponible',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: isDesktop ? 13 : 11,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
     );
   }
 }

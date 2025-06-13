@@ -30,30 +30,21 @@ ORDER BY tablename;
 -- 5. PROBAR INSERT EN ANIMALES
 INSERT INTO public.animales (
     nombre,
-    especie,
+    correo,
+    contraseña,
+    ubicacion,
+    tipo,
     raza,
-    edad_anos,
-    edad_meses,
-    peso,
-    color,
-    sexo,
-    esterilizado,
-    observaciones_medicas,
-    created_at,
-    updated_at
+    edad,
+    altura
 ) VALUES (
     'PRUEBA_RLS_FINAL',
-    'Perro',
-    'Labrador',
-    3,
-    2,
-    25.5,
-    'Dorado',
-    'Macho',
-    true,
-    'Prueba después de corrección RLS completa',
-    NOW(),
-    NOW()
+    'prueba_rls@test.com',
+    '123456',
+    'Madrid',
+    'Perro',    'Labrador',
+    '3 años',
+    '60 cm'
 );
 
 -- 6. VERIFICAR QUE SE INSERTÓ
