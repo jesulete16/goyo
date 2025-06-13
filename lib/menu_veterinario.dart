@@ -167,7 +167,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
     );
   }
 
-  Future<void> _actualizarEstadoCita(int citaId, String nuevoEstado) async {
+  Future<void> _actualizarEstadoCita(String citaId, String nuevoEstado) async {
     try {
       print('🔄 Actualizando cita $citaId a estado: $nuevoEstado');
       
@@ -290,10 +290,9 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
             ),
-            ElevatedButton(
-              onPressed: () {
+            ElevatedButton(              onPressed: () {
                 Navigator.of(context).pop();
-                _actualizarEstadoCita(cita['id'], nuevoEstado);
+                _actualizarEstadoCita(cita['id'].toString(), nuevoEstado);
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: isCompletar ? Colors.greenAccent : Colors.redAccent,
