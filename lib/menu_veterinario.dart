@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'login.dart';
 import 'solicitudes_veterinario.dart';
+import 'editar_perfil_veterinario.dart';
 
 class MenuVeterinario extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -25,11 +26,16 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   int _conteoSolicitudesPendientes = 0;
-
+  
+  // Datos actualizables del veterinario
+  late Map<String, dynamic> _veterinarioData;
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now();
+    
+    // Inicializar datos del veterinario
+    _veterinarioData = Map<String, dynamic>.from(widget.userData);
     
     // Inicializar localización para fechas en español
     initializeDateFormatting('es_ES', null);
@@ -333,9 +339,19 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-    
-    return Scaffold(
-      backgroundColor: const Color(0xFF0D2818),
+      return Scaffold(
+      backgroundColor: const Color(0xFF0D2818),      appBar: AppBar(
+        title: Text(
+          'Dr. ${_veterinarioData['nombre'] ?? 'Veterinario'}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: const Color(0xFF1B5E20),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 4,
+      ),
       drawer: Drawer(
         backgroundColor: const Color(0xFF1B5E20),
         child: ListView(
@@ -357,18 +373,75 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                     backgroundColor: Colors.white,
                     child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 40),
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Dr. ${widget.userData['nombre'] ?? ''}',
+                  const SizedBox(height: 10),                  Text(
+                    'Dr. ${_veterinarioData['nombre'] ?? ''}',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   Text(
-                    widget.userData['especialidad'] ?? 'Veterinario',
+                    _veterinarioData['especialidad'] ?? 'Veterinario',
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),],
+              ),            ),
+            // Botón de editar perfil (VERSIÓN DE PRUEBA)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  print('🔧 Botón Editar Perfil presionado');
+                  Navigator.pop(context);
+                  
+                  // Mostrar mensaje temporal para confirmar que funciona
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('¡Botón de editar perfil funciona! Navegando...'),
+                      backgroundColor: Colors.blue,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                    // Navegar a la página de editar perfil
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditarPerfilVeterinario(userData: _veterinarioData),
+                    ),
+                  ).then((result) {
+                    if (result != null) {
+                      print('🔄 Actualizando datos del veterinario con: $result');
+                      setState(() {
+                        // Actualizar los datos locales con los datos que vienen del editor
+                        _veterinarioData = Map<String, dynamic>.from(result);
+                      });
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Perfil actualizado correctamente'),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  });
+                },
+                icon: const Icon(Icons.edit, color: Colors.white, size: 20),
+                label: const Text(
+                  'Editar Perfil',
+                  style: TextStyle(
+                    color: Colors.white, 
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                ],
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  elevation: 6,
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
-            ),            ListTile(
+            ),
+            const SizedBox(height: 8),
+            ListTile(
               leading: const Icon(Icons.calendar_today, color: Colors.greenAccent),
               title: const Text('Mi Calendario', style: TextStyle(color: Colors.white)),
               onTap: () => Navigator.pop(context),
@@ -445,9 +518,8 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Dr. ${widget.userData['nombre']}',
+                          children: [                            Text(
+                              'Dr. ${_veterinarioData['nombre']}',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontSize: isDesktop ? 20 : 16,
@@ -460,7 +532,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                                 const Icon(Icons.medical_services, color: Colors.greenAccent, size: 14),
                                 const SizedBox(width: 4),
                                 Text(
-                                  widget.userData['especialidad'] ?? 'Veterinario',
+                                  _veterinarioData['especialidad'] ?? 'Veterinario',
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: isDesktop ? 12 : 10,
@@ -468,7 +540,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                                   ),
                                 ),
                               ],
-                            ),                          ],
+                            ),],
                         ),
                       ),
                       Row(
