@@ -36,9 +36,11 @@ dependencies:
   
   # Supabase para backend y autenticación
   supabase_flutter: ^2.5.6
-  
-  # Image picker para selección de fotos
+    # Image picker para selección de fotos
   image_picker: ^1.0.4
+  
+  # Calendario para mostrar citas del veterinario
+  table_calendar: ^3.0.9
 
 dev_dependencies:
   flutter_test:
