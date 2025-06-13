@@ -40,9 +40,11 @@ dependencies:
   image_picker: ^1.0.4
     # Calendario para mostrar citas del veterinario
   table_calendar: ^3.0.9
-  
-  # Internacionalización y formateo de fechas
+    # Internacionalización y formateo de fechas
   intl: ^0.19.0
+  
+  # Para guardar preferencias localmente (Recuérdame)
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login.dart';
 import 'cita_calendar.dart';
 import 'perfil_animal.dart';
+import 'services/user_preferences.dart';
 
 class MenuAnimal extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -325,10 +326,13 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () {
+            ),            ElevatedButton(
+              onPressed: () async {
                 Navigator.of(context).pop();
+                
+                // Limpiar sesión guardada
+                await UserPreferences.clearUserSession();
+                
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
                 );
@@ -357,17 +361,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
               // pero podemos actualizar campos específicos si es necesario
             });
           },        ),
-      ),
-    );
-  }
-
-  Future<void> _recargarTodosDatos() async {
-    print('🔄 Recargando todos los datos del menú animal...');
-    await Future.wait([
-      _loadVeterinarios(),
-      _loadMisCitas(),
-      _loadNotificaciones(),
-    ]);
+      ),    );
   }
 
   @override
@@ -763,11 +757,12 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
     return RefreshIndicator(
       onRefresh: _loadVeterinarios,
       color: Colors.greenAccent,      child: GridView.builder(
-        padding: EdgeInsets.all(isDesktop ? 16 : 12),        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: isDesktop ? 4 : (MediaQuery.of(context).size.width > 600 ? 3 : 2),
-          childAspectRatio: isDesktop ? 0.85 : 0.95,
-          crossAxisSpacing: isDesktop ? 12 : 8,
-          mainAxisSpacing: isDesktop ? 12 : 8,
+        padding: EdgeInsets.all(isDesktop ? 12 : 8),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isDesktop ? 5 : (MediaQuery.of(context).size.width > 600 ? 4 : 3),
+          childAspectRatio: isDesktop ? 0.75 : 0.85,
+          crossAxisSpacing: isDesktop ? 8 : 6,
+          mainAxisSpacing: isDesktop ? 8 : 6,
         ),
         itemCount: veterinarios.length,
         itemBuilder: (context, index) {
@@ -848,7 +843,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,        decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(isDesktop ? 14 : 10),
+          borderRadius: BorderRadius.circular(isDesktop ? 12 : 8),
           border: Border.all(
             color: Colors.greenAccent.withOpacity(0.25),
             width: 1,
@@ -856,17 +851,17 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.08),
-              blurRadius: isDesktop ? 12 : 8,
-              offset: const Offset(0, 3),
+              blurRadius: isDesktop ? 8 : 6,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(isDesktop ? 14 : 10),
+          borderRadius: BorderRadius.circular(isDesktop ? 12 : 8),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
             child: Padding(
-              padding: EdgeInsets.all(isDesktop ? 12 : 8),
+              padding: EdgeInsets.all(isDesktop ? 10 : 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -874,7 +869,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [                      CircleAvatar(
-                        radius: isDesktop ? 20 : 16,
+                        radius: isDesktop ? 18 : 14,
                         backgroundColor: Colors.greenAccent.withOpacity(0.18),
                         backgroundImage: veterinario['foto_url'] != null
                             ? NetworkImage(veterinario['foto_url'])
@@ -883,22 +878,22 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                             ? Icon(
                                 Icons.person,
                                 color: Colors.greenAccent,
-                                size: isDesktop ? 22 : 18,
+                                size: isDesktop ? 20 : 16,
                               )
                             : null,
                       ),
-                      SizedBox(width: isDesktop ? 8 : 6),
+                      SizedBox(width: isDesktop ? 6 : 4),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               children: [
-                                Flexible(
-                                  child: Text(
-                                    veterinario['nombre'] ?? 'Sin nombre',                                    style: TextStyle(
+                                Flexible(                                  child: Text(
+                                    veterinario['nombre'] ?? 'Sin nombre',
+                                    style: TextStyle(
                                       color: Colors.white,
-                                      fontSize: isDesktop ? 13 : 11,
+                                      fontSize: isDesktop ? 15 : 13,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.3,
                                     ),
@@ -908,29 +903,29 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                                 ),
                                 if ((veterinario['especialidad'] ?? '').toString().toLowerCase() == 'general')
                                   Padding(
-                                    padding: const EdgeInsets.only(left: 6),
-                                    child: Tooltip(
+                                    padding: const EdgeInsets.only(left: 6),                                    child: Tooltip(
                                       message: 'Veterinario general',
-                                      child: Icon(Icons.verified, color: Colors.blue[200], size: isDesktop ? 18 : 14),
+                                      child: Icon(Icons.verified, color: Colors.blue[200], size: isDesktop ? 16 : 12),
                                     ),
                                   ),
                               ],
-                            ),
-                            const SizedBox(height: 4),
-                            Container(                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            ),                            const SizedBox(height: 3),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Colors.greenAccent.withOpacity(0.22),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
-                                children: [                                  Icon(Icons.medical_services, color: Colors.greenAccent, size: isDesktop ? 10 : 8),
-                                  const SizedBox(width: 2),
+                                children: [
+                                  Icon(Icons.medical_services, color: Colors.greenAccent, size: isDesktop ? 12 : 10),
+                                  const SizedBox(width: 3),
                                   Text(
                                     veterinario['especialidad'] ?? 'General',
                                     style: TextStyle(
                                       color: Colors.greenAccent,
-                                      fontSize: isDesktop ? 9 : 7,
+                                      fontSize: isDesktop ? 11 : 9,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
@@ -941,12 +936,12 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                         ),
                       ),
                     ],
-                  ),                  const SizedBox(height: 6),
+                  ),                  const SizedBox(height: 8),
                   // Información del veterinario
                   _buildInfoRow(Icons.location_on, veterinario['ubicacion'], isDesktop),
-                  SizedBox(height: isDesktop ? 3 : 2),
+                  SizedBox(height: isDesktop ? 4 : 3),
                   _buildInfoRow(Icons.star, '${veterinario['años_experiencia'] ?? 0} años', isDesktop),
-                  SizedBox(height: isDesktop ? 3 : 2),
+                  SizedBox(height: isDesktop ? 4 : 3),
                   _buildInfoRow(Icons.phone, veterinario['telefono'], isDesktop),
                   const Spacer(),
                   // Botón pedir cita
@@ -957,15 +952,17 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.greenAccent,
                         foregroundColor: Colors.black,                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(isDesktop ? 10 : 8),
-                        ),                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 8 : 6),
+                          borderRadius: BorderRadius.circular(isDesktop ? 8 : 6),
+                        ),
+                        padding: EdgeInsets.symmetric(vertical: isDesktop ? 10 : 8),
                         elevation: 3,
                         shadowColor: Colors.greenAccent.withOpacity(0.12),
                         textStyle: TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: isDesktop ? 11 : 9,
+                          fontSize: isDesktop ? 13 : 11,
                         ),
-                      ),                      icon: const Icon(Icons.calendar_month, size: 14),
+                      ),
+                      icon: const Icon(Icons.calendar_month, size: 16),
                       label: const Text('Cita'),
                     ),
                   ),
@@ -1349,21 +1346,22 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       },
     );
   }
-
   Widget _buildInfoRow(IconData icon, String? text, bool isDesktop) {
     return Row(
-      children: [        Icon(
+      children: [
+        Icon(
           icon,
           color: Colors.white70,
-          size: isDesktop ? 10 : 8,
+          size: isDesktop ? 14 : 12,
         ),
-        SizedBox(width: isDesktop ? 4 : 3),
+        SizedBox(width: isDesktop ? 6 : 4),
         Expanded(
           child: Text(
             text ?? 'No disponible',
             style: TextStyle(
               color: Colors.white70,
-              fontSize: isDesktop ? 9 : 7,
+              fontSize: isDesktop ? 12 : 10,
+              fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,

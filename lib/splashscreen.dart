@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'login.dart';
+import 'menu_animal.dart';
+import 'menu_veterinario.dart';
+import 'services/user_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -40,14 +43,59 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.elasticOut,
     ));    _animationController.forward();
     
-    // Navegar al login después de 5 segundos
-    Timer(const Duration(seconds: 5), () {
+    // Verificar si hay sesión guardada después de 3 segundos
+    Timer(const Duration(seconds: 3), () async {
+      await _checkRememberedSession();
+    });
+  }
+
+  Future<void> _checkRememberedSession() async {
+    try {
+      // Verificar si hay una sesión guardada
+      final session = await UserPreferences.getRememberedSession();
+      
+      if (session != null && mounted) {
+        final userData = session['userData'] as Map<String, dynamic>;
+        final userType = session['userType'] as String;
+        
+        print('🔍 Sesión encontrada: ${userData['nombre']} como $userType');
+        
+        // Navegar directamente al menú correspondiente
+        if (userType == 'animal') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => MenuAnimal(userData: userData),
+            ),
+          );
+        } else if (userType == 'veterinario') {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => MenuVeterinario(userData: userData),
+            ),
+          );
+        } else {
+          // Tipo de usuario desconocido, ir al login
+          _navigateToLogin();
+        }
+      } else {
+        // No hay sesión guardada, ir al login
+        _navigateToLogin();
+      }
+    } catch (e) {
+      print('❌ Error verificando sesión guardada: $e');
+      // En caso de error, ir al login
+      _navigateToLogin();
+    }
+  }
+
+  void _navigateToLogin() {
+    if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => const LoginScreen(),
         ),
       );
-    });
+    }
   }
 
   @override

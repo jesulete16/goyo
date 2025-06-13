@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'login.dart';
 import 'solicitudes_veterinario.dart';
 import 'editar_perfil_veterinario.dart';
+import 'services/user_preferences.dart';
 
 class MenuVeterinario extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -177,10 +178,13 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Cancelar', style: TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () {
+            ),            ElevatedButton(
+              onPressed: () async {
                 Navigator.of(context).pop();
+                
+                // Limpiar sesión guardada
+                await UserPreferences.clearUserSession();
+                
                 Navigator.of(context).pushReplacement(
                   MaterialPageRoute(builder: (context) => const LoginScreen()),
                 );
@@ -336,47 +340,99 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
     );
   }
 
+  Widget _buildProfileHeader(bool isDesktop) {
+    final fotoUrl = _veterinarioData['foto_url'] as String?;
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: isDesktop ? 32 : 28,
+            backgroundColor: Colors.white,
+            backgroundImage: (fotoUrl != null && fotoUrl.isNotEmpty)
+                ? NetworkImage(fotoUrl)
+                : null,
+            child: (fotoUrl == null || fotoUrl.isEmpty)
+                ? const Icon(Icons.person, color: Color(0xFF1B5E20), size: 32)
+                : null,
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Dr. ${_veterinarioData['nombre'] ?? ''}',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: isDesktop ? 18 : 15,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.medical_services, color: Colors.greenAccent, size: isDesktop ? 16 : 13),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        _veterinarioData['especialidad'] ?? 'Veterinario',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isDesktop ? 13 : 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDesktop = MediaQuery.of(context).size.width > 800;
-      return Scaffold(
-      backgroundColor: const Color(0xFF0D2818),      appBar: AppBar(
-        title: Text(
-          'Dr. ${_veterinarioData['nombre'] ?? 'Veterinario'}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D2818),
+      appBar: AppBar(
         backgroundColor: const Color(0xFF1B5E20),
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 4,
+        automaticallyImplyLeading: true, // Solo muestra el icono de menú/desplazable
       ),
       drawer: Drawer(
         backgroundColor: const Color(0xFF1B5E20),
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF1B5E20), Color(0xFF2E7D32)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,                children: [
-                  _buildProfileAvatar(),
-                  const SizedBox(height: 10),Text(
-                    'Dr. ${_veterinarioData['nombre'] ?? ''}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-                  ),
-                  Text(
-                    _veterinarioData['especialidad'] ?? 'Veterinario',
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),],
-              ),            ),
+            // Header compacto y elegante
+            _buildProfileHeader(isDesktop),
             // Botón de editar perfil (VERSIÓN DE PRUEBA)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -486,56 +542,60 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           child: FadeTransition(
             opacity: _fadeAnimation,
             child: Column(
-              children: [
-                // Header
+              children: [                // Header ultra compacto y pequeño
                 Container(
-                  padding: EdgeInsets.all(isDesktop ? 20 : 12),
-                  margin: EdgeInsets.symmetric(horizontal: isDesktop ? 20 : 8, vertical: isDesktop ? 12 : 6),
+                  padding: EdgeInsets.symmetric(horizontal: isDesktop ? 14 : 10, vertical: isDesktop ? 10 : 8),
+                  margin: EdgeInsets.symmetric(horizontal: isDesktop ? 12 : 8, vertical: isDesktop ? 4 : 3),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.13),
-                    borderRadius: BorderRadius.circular(20),
+                    color: const Color(0xFF1B5E20),
+                    borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.10),
-                        blurRadius: 12,
-                        offset: const Offset(0, 4),
+                        color: Colors.black.withOpacity(0.12),
+                        blurRadius: 6,
+                        offset: const Offset(0, 1),
                       ),
                     ],
                   ),
-                  child: Row(                    children: [
+                  child: Row(
+                    children: [
                       _buildSmallProfileAvatar(),
-                      SizedBox(width: isDesktop ? 16 : 10),
+                      SizedBox(width: isDesktop ? 12 : 8),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [                            Text(
-                              'Dr. ${_veterinarioData['nombre']}',
+                          children: [
+                            Text(
+                              '${_veterinarioData['nombre'] ?? 'Dr. Luis Miguel'}',
                               style: TextStyle(
                                 color: Colors.white,
-                                fontSize: isDesktop ? 20 : 16,
+                                fontSize: isDesktop ? 16 : 14,
                                 fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
+                                letterSpacing: 0.3,
                               ),
                             ),
+                            const SizedBox(height: 1),
                             Row(
                               children: [
-                                const Icon(Icons.medical_services, color: Colors.greenAccent, size: 14),
+                                const Icon(Icons.medical_services, color: Colors.greenAccent, size: 12),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _veterinarioData['especialidad'] ?? 'Veterinario',
+                                  _veterinarioData['especialidad'] ?? 'Perro',
                                   style: TextStyle(
                                     color: Colors.white70,
-                                    fontSize: isDesktop ? 12 : 10,
+                                    fontSize: isDesktop ? 11 : 9,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ],
-                            ),],
+                            ),
+                          ],
                         ),
                       ),
                       Row(
                         children: [
-                          IconButton(                            onPressed: () async {
+                          IconButton(
+                            onPressed: () async {
                               final result = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -600,14 +660,13 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                                   ),
                                 ],
                               ),
-                            )
-                          : SingleChildScrollView(
-                              padding: EdgeInsets.all(isDesktop ? 16 : 12),
+                            )                          : SingleChildScrollView(
+                              padding: EdgeInsets.all(isDesktop ? 10 : 6),
                               child: Column(
                                 children: [
                                   // Calendario
                                   _buildCalendar(isDesktop),
-                                  SizedBox(height: isDesktop ? 20 : 16),
+                                  SizedBox(height: isDesktop ? 12 : 8),
                                   // Citas del día seleccionado
                                   _buildCitasDelDia(isDesktop),
                                 ],
@@ -621,21 +680,20 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
       ),
     );
   }
-
   Widget _buildCalendar(bool isDesktop) {
     return Container(
-      padding: EdgeInsets.all(isDesktop ? 16 : 12),
+      padding: EdgeInsets.all(isDesktop ? 10 : 8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
-      ),      child: TableCalendar<Map<String, dynamic>>(
+      ),child: TableCalendar<Map<String, dynamic>>(
         firstDay: DateTime.utc(2020, 1, 1),
         lastDay: DateTime.utc(2030, 12, 31),
         focusedDay: _focusedDay,
@@ -666,17 +724,16 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           markersMaxCount: 3,
           // Fondo del calendario
           outsideDaysVisible: false,
-        ),
-        headerStyle: const HeaderStyle(
+        ),        headerStyle: const HeaderStyle(
           formatButtonVisible: false,
           titleCentered: true,
-          leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white),
-          rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white),
-          titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+          leftChevronIcon: Icon(Icons.chevron_left, color: Colors.white, size: 20),
+          rightChevronIcon: Icon(Icons.chevron_right, color: Colors.white, size: 20),
+          titleTextStyle: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
         ),
         daysOfWeekStyle: const DaysOfWeekStyle(
-          weekdayStyle: TextStyle(color: Colors.white70),
-          weekendStyle: TextStyle(color: Colors.white70),
+          weekdayStyle: TextStyle(color: Colors.white70, fontSize: 12),
+          weekendStyle: TextStyle(color: Colors.white70, fontSize: 12),
         ),
         onDaySelected: (selectedDay, focusedDay) {
           setState(() {
@@ -694,17 +751,16 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
 
   Widget _buildCitasDelDia(bool isDesktop) {
     final fechaSeleccionada = _selectedDay ?? DateTime.now();
-    
-    return Container(
-      padding: EdgeInsets.all(isDesktop ? 16 : 12),
+      return Container(
+      padding: EdgeInsets.all(isDesktop ? 10 : 8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -713,36 +769,36 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
         children: [
           Row(
             children: [
-              const Icon(Icons.calendar_today, color: Colors.greenAccent, size: 20),
-              const SizedBox(width: 8),
+              const Icon(Icons.calendar_today, color: Colors.greenAccent, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Citas del ${fechaSeleccionada.day}/${fechaSeleccionada.month}/${fechaSeleccionada.year}',
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: isDesktop ? 18 : 16,
+                  fontSize: isDesktop ? 14 : 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const Spacer(),
               if (_citasDelDia.isNotEmpty)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
                     color: Colors.greenAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     '${_citasDelDia.length} citas',
                     style: const TextStyle(
                       color: Colors.greenAccent,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: 10,
                     ),
                   ),
                 ),
             ],
           ),
-          SizedBox(height: isDesktop ? 16 : 12),
+          SizedBox(height: isDesktop ? 10 : 8),
           _citasDelDia.isEmpty
               ? Center(
                   child: Column(
@@ -804,23 +860,20 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
       default:
         estadoColor = Colors.grey;
         estadoIcon = Icons.help;
-    }
-
-    return Container(
-      margin: EdgeInsets.only(bottom: isDesktop ? 12 : 8),
-      padding: EdgeInsets.all(isDesktop ? 16 : 12),
+    }    return Container(
+      margin: EdgeInsets.only(bottom: isDesktop ? 8 : 6),
+      padding: EdgeInsets.all(isDesktop ? 10 : 8),
       decoration: BoxDecoration(
         color: estadoColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: estadoColor.withOpacity(0.5),
-          width: 1.5,
-        ),
-        boxShadow: [
+          width: 1,
+        ),        boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -831,18 +884,18 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: estadoColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(
                   estadoIcon,
                   color: estadoColor,
-                  size: isDesktop ? 20 : 18,
+                  size: isDesktop ? 16 : 14,
                 ),
               ),
-              SizedBox(width: isDesktop ? 12 : 8),
+              SizedBox(width: isDesktop ? 8 : 6),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,7 +904,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                       '$horaInicio - $horaFin',
                       style: TextStyle(
                         color: Colors.white,
-                        fontSize: isDesktop ? 16 : 14,
+                        fontSize: isDesktop ? 13 : 11,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -859,23 +912,22 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                       animal?['nombre'] ?? 'Animal sin nombre',
                       style: TextStyle(
                         color: Colors.white70,
-                        fontSize: isDesktop ? 14 : 12,
+                        fontSize: isDesktop ? 11 : 9,
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: estadoColor,
                   borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
+                ),                child: Text(
                   estado.toUpperCase(),
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 10,
+                    fontSize: 8,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -883,14 +935,14 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
             ],
           ),
           
-          SizedBox(height: isDesktop ? 12 : 8),
+          SizedBox(height: isDesktop ? 8 : 6),
           
           // Información del animal
           Container(
-            padding: EdgeInsets.all(isDesktop ? 12 : 8),
+            padding: EdgeInsets.all(isDesktop ? 8 : 6),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(6),
             ),
             child: Column(
               children: [
@@ -904,7 +956,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                         isDesktop,
                       ),
                     ),
-                    SizedBox(width: isDesktop ? 12 : 8),
+                    SizedBox(width: isDesktop ? 8 : 6),
                     Expanded(
                       child: _buildInfoItem(
                         Icons.category,
@@ -915,7 +967,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                     ),
                   ],
                 ),
-                SizedBox(height: isDesktop ? 8 : 6),
+                SizedBox(height: isDesktop ? 6 : 4),
                 Row(
                   children: [
                     Expanded(
@@ -924,9 +976,8 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                         'Raza',
                         animal?['raza'] ?? 'No especificada',
                         isDesktop,
-                      ),
-                    ),
-                    SizedBox(width: isDesktop ? 12 : 8),
+                      ),                    ),
+                    SizedBox(width: isDesktop ? 8 : 6),
                     Expanded(
                       child: _buildInfoItem(
                         Icons.euro,
@@ -937,7 +988,8 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                     ),
                   ],
                 ),
-                SizedBox(height: isDesktop ? 8 : 6),                _buildInfoItem(
+                SizedBox(height: isDesktop ? 6 : 4),
+                _buildInfoItem(
                   Icons.notes,
                   'Motivo',
                   cita['motivo'] ?? 'Consulta general',
@@ -950,48 +1002,47 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           
           // Botones de acción (solo para citas programadas o confirmadas)
           if (estado == 'programada' || estado == 'confirmada') ...[
-            SizedBox(height: isDesktop ? 12 : 8),
+            SizedBox(height: isDesktop ? 8 : 6),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _mostrarConfirmacionEstado(cita, 'completada'),
-                    icon: const Icon(Icons.check_circle, size: 18),
+                    icon: const Icon(Icons.check_circle, size: 14),
                     label: Text(
                       'Completar',
-                      style: TextStyle(fontSize: isDesktop ? 12 : 10),
+                      style: TextStyle(fontSize: isDesktop ? 10 : 8),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.greenAccent,
                       foregroundColor: Colors.black,
                       padding: EdgeInsets.symmetric(
-                        vertical: isDesktop ? 8 : 6,
-                        horizontal: isDesktop ? 12 : 8,
+                        vertical: isDesktop ? 6 : 4,
+                        horizontal: isDesktop ? 8 : 6,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(width: isDesktop ? 8 : 6),
+                ),                SizedBox(width: isDesktop ? 6 : 4),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _mostrarConfirmacionEstado(cita, 'cancelada'),
-                    icon: const Icon(Icons.cancel, size: 18),
+                    icon: const Icon(Icons.cancel, size: 14),
                     label: Text(
                       'Cancelar',
-                      style: TextStyle(fontSize: isDesktop ? 12 : 10),
+                      style: TextStyle(fontSize: isDesktop ? 10 : 8),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
                       foregroundColor: Colors.white,
                       padding: EdgeInsets.symmetric(
-                        vertical: isDesktop ? 8 : 6,
-                        horizontal: isDesktop ? 12 : 8,
+                        vertical: isDesktop ? 6 : 4,
+                        horizontal: isDesktop ? 8 : 6,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                     ),
                   ),
@@ -1015,25 +1066,24 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
               Icon(
                 icon,
                 color: Colors.white70,
-                size: isDesktop ? 14 : 12,
+                size: isDesktop ? 12 : 10,
               ),
-              SizedBox(width: isDesktop ? 6 : 4),
+              SizedBox(width: isDesktop ? 4 : 3),
               Text(
-                label,
-                style: TextStyle(
+                label,                style: TextStyle(
                   color: Colors.white70,
-                  fontSize: isDesktop ? 11 : 9,
+                  fontSize: isDesktop ? 9 : 7,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
-          SizedBox(height: isDesktop ? 4 : 2),
+          SizedBox(height: isDesktop ? 3 : 2),
           Text(
             value,
             style: TextStyle(
               color: Colors.white,
-              fontSize: isDesktop ? 12 : 10,
+              fontSize: isDesktop ? 10 : 8,
               fontWeight: FontWeight.bold,
             ),
             maxLines: fullWidth ? 2 : 1,
@@ -1075,67 +1125,25 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildProfileAvatar() {
-    final fotoUrl = _veterinarioData['foto_url'];
-    
-    if (fotoUrl != null && fotoUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 38,
-        backgroundColor: Colors.white,
-        child: ClipOval(
-          child: Image.network(
-            fotoUrl,
-            width: 76,
-            height: 76,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1B5E20)),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              print('🚨 Error cargando foto de perfil: $error');
-              return const Icon(
-                Icons.local_hospital, 
-                color: Color(0xFF1B5E20), 
-                size: 40
-              );
-            },
-          ),
-        ),
-      );
-    } else {
-      // Foto por defecto si no hay URL
-      return const CircleAvatar(
-        radius: 38,
-        backgroundColor: Colors.white,
-        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 40),
-      );
-    }
-  }
-
+    );  }
   Widget _buildSmallProfileAvatar() {
     final fotoUrl = _veterinarioData['foto_url'];
     
     if (fotoUrl != null && fotoUrl.isNotEmpty) {
       return CircleAvatar(
-        radius: 24,
+        radius: 18,
         backgroundColor: Colors.white,
         child: ClipOval(
           child: Image.network(
             fotoUrl,
-            width: 48,
-            height: 48,
+            width: 36,
+            height: 36,
             fit: BoxFit.cover,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
               return const SizedBox(
-                width: 20,
-                height: 20,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1B5E20)),
@@ -1146,7 +1154,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
               return const Icon(
                 Icons.local_hospital, 
                 color: Color(0xFF1B5E20), 
-                size: 28
+                size: 20
               );
             },
           ),
@@ -1155,9 +1163,9 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
     } else {
       // Foto por defecto si no hay URL
       return const CircleAvatar(
-        radius: 24,
+        radius: 18,
         backgroundColor: Colors.white,
-        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 28),
+        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 20),
       );
     }
   }

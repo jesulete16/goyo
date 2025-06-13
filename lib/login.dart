@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'register_menu.dart';
 import 'menu_animal.dart';
 import 'menu_veterinario.dart';
+import 'services/user_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -165,9 +166,17 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               });
           
           print('🔑 Verificación de contraseña: $passwordCheck');
-          
-          if (passwordCheck == true) {
+            if (passwordCheck == true) {
             print('✅ Login exitoso');
+            
+            // Guardar sesión si "Recuérdame" está marcado
+            if (_rememberMe) {
+              await UserPreferences.saveUserSession(
+                userData: userRecord,
+                userType: _selectedUserType,
+              );
+            }
+            
             // Crear una sesión ficticia para navegación (sin autenticación real de Supabase)
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -257,8 +266,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
             _passwordController.text == '123456') {
           
           print('⚠️ Error de conexión detectado, pero usando credenciales conocidas para desarrollo');
-          
-          // Crear datos de usuario mock para poder continuar 
+            // Crear datos de usuario mock para poder continuar 
           // Esto es solo para desarrollo, QUITAR EN PRODUCCIÓN
           if (_selectedUserType == 'animal') {
             final mockUserData = {
@@ -273,6 +281,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               'altura': '60 cm',
             };
             
+            // Guardar sesión si "Recuérdame" está marcado
+            if (_rememberMe) {
+              await UserPreferences.saveUserSession(
+                userData: mockUserData,
+                userType: _selectedUserType,
+              );
+            }
+            
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => MenuAnimal(userData: mockUserData),
@@ -285,8 +301,7 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                 backgroundColor: Colors.orange,
               ),
             );
-            return;
-          } else if (_emailController.text.trim() == 'carlos.martinez@goyo.vet' && 
+            return;          } else if (_emailController.text.trim() == 'carlos.martinez@goyo.vet' && 
                      _passwordController.text == '123456') {
             final mockVetData = {
               'id': 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -299,6 +314,14 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               'años_experiencia': 15,
               'telefono': '+34 600 123 456',
             };
+            
+            // Guardar sesión si "Recuérdame" está marcado
+            if (_rememberMe) {
+              await UserPreferences.saveUserSession(
+                userData: mockVetData,
+                userType: _selectedUserType,
+              );
+            }
             
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
