@@ -366,14 +366,9 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                 ),
               ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircleAvatar(
-                    radius: 38,
-                    backgroundColor: Colors.white,
-                    child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 40),
-                  ),
-                  const SizedBox(height: 10),                  Text(
+                mainAxisAlignment: MainAxisAlignment.center,                children: [
+                  _buildProfileAvatar(),
+                  const SizedBox(height: 10),Text(
                     'Dr. ${_veterinarioData['nombre'] ?? ''}',
                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
                   ),
@@ -507,13 +502,8 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                       ),
                     ],
                   ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        radius: 24,
-                        backgroundColor: Colors.white,
-                        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 28),
-                      ),
+                  child: Row(                    children: [
+                      _buildSmallProfileAvatar(),
                       SizedBox(width: isDesktop ? 16 : 10),
                       Expanded(
                         child: Column(
@@ -1086,5 +1076,89 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           ),
       ],
     );
+  }
+
+  Widget _buildProfileAvatar() {
+    final fotoUrl = _veterinarioData['foto_url'];
+    
+    if (fotoUrl != null && fotoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 38,
+        backgroundColor: Colors.white,
+        child: ClipOval(
+          child: Image.network(
+            fotoUrl,
+            width: 76,
+            height: 76,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1B5E20)),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              print('🚨 Error cargando foto de perfil: $error');
+              return const Icon(
+                Icons.local_hospital, 
+                color: Color(0xFF1B5E20), 
+                size: 40
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      // Foto por defecto si no hay URL
+      return const CircleAvatar(
+        radius: 38,
+        backgroundColor: Colors.white,
+        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 40),
+      );
+    }
+  }
+
+  Widget _buildSmallProfileAvatar() {
+    final fotoUrl = _veterinarioData['foto_url'];
+    
+    if (fotoUrl != null && fotoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 24,
+        backgroundColor: Colors.white,
+        child: ClipOval(
+          child: Image.network(
+            fotoUrl,
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF1B5E20)),
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(
+                Icons.local_hospital, 
+                color: Color(0xFF1B5E20), 
+                size: 28
+              );
+            },
+          ),
+        ),
+      );
+    } else {
+      // Foto por defecto si no hay URL
+      return const CircleAvatar(
+        radius: 24,
+        backgroundColor: Colors.white,
+        child: Icon(Icons.local_hospital, color: Color(0xFF1B5E20), size: 28),
+      );
+    }
   }
 }
