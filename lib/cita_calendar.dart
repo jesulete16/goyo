@@ -235,7 +235,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
         horasDisponibles = [];
         isLoadingHoras = false;
       });
-    }  }  Future<void> _confirmarCita() async {
+    }  }  Future<void> _solicitarCita() async {
     if (selectedHora == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -266,7 +266,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
     );
     
     try {
-      print('📝 Creando cita...');
+      print('📝 Solicitando cita...');
       print('🏥 Veterinario: ${widget.veterinario['nombre']} (ID: ${widget.veterinario['id']})');
       print('🐾 Animal: ${widget.animalData['nombre']} (ID: ${widget.animalData['id']})');
       print('📅 Fecha: ${selectedDate.toString().split(' ')[0]}');
@@ -318,7 +318,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
         'fecha': selectedDate.toString().split(' ')[0], // YYYY-MM-DD
         'hora_inicio': '$selectedHora:00', // Asegurar formato HH:MM:SS
         'hora_fin': '$horaFinString:00',   // Asegurar formato HH:MM:SS
-        'estado': 'programada',
+        'estado': 'pendiente',
         'motivo': selectedMotivo,
         'precio': selectedPrecio,
       };
@@ -330,7 +330,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
           .insert(citaData)
           .select(); // Seleccionar la cita creada para confirmar
       
-      print('✅ Cita creada exitosamente: $response');
+      print('✅ Solicitud de cita creada exitosamente: $response');
       
       // Cerrar loading dialog
       if (mounted) Navigator.of(context).pop();
@@ -349,9 +349,8 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        '¡Cita confirmada!',
+                    children: [                      Text(
+                        '¡Solicitud enviada!',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -366,7 +365,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                         style: const TextStyle(fontSize: 14),
                       ),
                       Text(
-                        'Dr. ${widget.veterinario['nombre']}',
+                        'Pendiente de aprobación por Dr. ${widget.veterinario['nombre']}',
                         style: const TextStyle(fontSize: 12),
                       ),
                     ],
@@ -756,7 +755,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                                 Expanded(
                                   flex: 2,
                                   child: ElevatedButton(
-                                    onPressed: selectedHora != null ? _confirmarCita : null,
+                                    onPressed: selectedHora != null ? _solicitarCita : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: selectedHora != null 
                                           ? Colors.greenAccent 
@@ -774,7 +773,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                                     ),
                                     child: Text(
                                       selectedHora != null 
-                                          ? 'Confirmar Cita - $selectedHora'
+                                          ? 'Solicitar Cita - $selectedHora'
                                           : 'Selecciona una hora',
                                       style: TextStyle(
                                         fontSize: isDesktop ? 16 : 14,

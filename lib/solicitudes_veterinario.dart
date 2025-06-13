@@ -17,6 +17,7 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
   List<Map<String, dynamic>> _solicitudesPendientes = [];
   bool _isLoading = true;
   String? _errorMessage;
+  bool _huboCambios = false; // Variable para rastrear si hubo cambios
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
@@ -75,7 +76,7 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
             )
           ''')
           .eq('veterinario_id', widget.userData['id'])
-          .eq('estado', 'solicitada')
+          .eq('estado', 'pendiente')
           .order('created_at', ascending: false);
       
       print('📋 Solicitudes encontradas: ${response.length}');
@@ -103,9 +104,11 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
           .update({'estado': nuevoEstado})
           .eq('id', citaId)
           .select();
-      
-      if (response.isNotEmpty) {
+        if (response.isNotEmpty) {
         print('✅ Solicitud respondida exitosamente');
+        
+        // Marcar que hubo cambios para notificar al menu principal
+        _huboCambios = true;
         
         // Recargar las solicitudes para quitar la que se acaba de responder
         await _loadSolicitudesPendientes();
@@ -313,9 +316,13 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
 
   @override
   Widget build(BuildContext context) {
-    final isDesktop = MediaQuery.of(context).size.width > 800;
-    
-    return Scaffold(
+    final isDesktop = MediaQuery.of(context).size.width > 800;    
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pop(context, _huboCambios);
+        return false; // Prevenir el pop automático ya que lo hacemos manualmente
+      },
+      child: Scaffold(
       backgroundColor: const Color(0xFF0D2818),
       drawer: Drawer(
         backgroundColor: const Color(0xFF1B5E20),
@@ -349,11 +356,10 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
                   ),
                 ],
               ),
-            ),
-            ListTile(
+            ),            ListTile(
               leading: const Icon(Icons.calendar_today, color: Colors.greenAccent),
               title: const Text('Mi Calendario', style: TextStyle(color: Colors.white)),
-              onTap: () => Navigator.pop(context),
+              onTap: () => Navigator.pop(context, _huboCambios),
             ),
             ListTile(
               leading: const Icon(Icons.pending_actions, color: Colors.orangeAccent),
@@ -530,12 +536,12 @@ class _SolicitudesVeterinarioState extends State<SolicitudesVeterinario> with Ti
                                     return _buildSolicitudCard(solicitud, isDesktop);
                                   },
                                 ),
-                ),
-              ],
+                ),              ],
             ),
           ),
         ),
       ),
+    ),
     );
   }
 

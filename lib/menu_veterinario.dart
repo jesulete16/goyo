@@ -352,15 +352,18 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
             ),
             ListTile(
               leading: const Icon(Icons.pending_actions, color: Colors.orangeAccent),
-              title: const Text('Solicitudes', style: TextStyle(color: Colors.white)),
-              onTap: () {
+              title: const Text('Solicitudes', style: TextStyle(color: Colors.white)),              onTap: () async {
                 Navigator.pop(context);
-                Navigator.push(
+                final result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => SolicitudesVeterinario(userData: widget.userData),
                   ),
                 );
+                // Si hubo cambios en las solicitudes, recargar las citas
+                if (result == true) {
+                  _loadCitasVeterinario();
+                }
               },
             ),
             const Divider(color: Colors.white30),
@@ -447,14 +450,17 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                       ),
                       Row(
                         children: [
-                          IconButton(
-                            onPressed: () {
-                              Navigator.push(
+                          IconButton(                            onPressed: () async {
+                              final result = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => SolicitudesVeterinario(userData: widget.userData),
                                 ),
                               );
+                              // Si hubo cambios en las solicitudes, recargar las citas
+                              if (result == true) {
+                                _loadCitasVeterinario();
+                              }
                             },
                             icon: const Icon(Icons.pending_actions, color: Colors.orangeAccent),
                             tooltip: 'Solicitudes Pendientes',
