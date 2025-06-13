@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
 
 class CitaCalendar extends StatefulWidget {
   final Map<String, dynamic> veterinario;
@@ -80,6 +81,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
   @override
   void dispose() {
     _animationController.dispose();
+    _stopAutoRefresh(); // Detener auto-actualización al cerrar el widget
     super.dispose();
   }  Future<void> _loadHorasDisponibles(DateTime fecha) async {
     setState(() {
@@ -122,28 +124,75 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
       } else {
         // Usar horarios por defecto
         todasLasHoras = [...horarioManana, ...horarioTarde];
-      }
-        // Obtener citas ya reservadas para esta fecha
+      }      // Obtener citas ya reservadas para esta fecha y veterinario
       final citasResponse = await Supabase.instance.client
           .from('citas')
-          .select('hora_inicio, hora_fin')
+          .select('hora_inicio, hora_fin, animal_id, estado')
           .eq('veterinario_id', widget.veterinario['id'])
-          .eq('fecha', fecha.toString().split(' ')[0]); // Solo fecha YYYY-MM-DD
+          .eq('fecha', fecha.toString().split(' ')[0]) // Solo fecha YYYY-MM-DD
+          .inFilter('estado', ['programada', 'confirmada']); // Solo citas activas
       
       print('📋 Citas ocupadas: $citasResponse');
       
-      // Filtrar horas ocupadas basándose en hora_inicio
-      final horasOcupadas = citasResponse.map((cita) => cita['hora_inicio'].toString()).toList();
+      // Procesar horas ocupadas - normalizar formato y crear lista de intervalos ocupados
+      List<String> horasOcupadas = [];
       
-      // Filtrar horas pasadas si es hoy
+      for (var cita in citasResponse) {
+        String horaInicio = cita['hora_inicio'].toString();
+        String horaFin = cita['hora_fin'].toString();
+        
+        // Normalizar formato (quitar segundos si los tiene)
+        // De "10:00:00" a "10:00", o mantener "10:00" como está
+        if (horaInicio.contains(':')) {
+          List<String> partes = horaInicio.split(':');
+          horaInicio = '${partes[0]}:${partes[1]}';
+        }
+        if (horaFin.contains(':')) {
+          List<String> partes = horaFin.split(':');
+          horaFin = '${partes[0]}:${partes[1]}';
+        }
+        
+        print('🚫 Hora ocupada detectada: $horaInicio - $horaFin (Animal: ${cita['animal_id']})');
+        
+        // Agregar todas las horas en el rango ocupado
+        // Por ejemplo, si la cita es de 10:00 a 10:30, marcar 10:00 como ocupada
+        horasOcupadas.add(horaInicio);
+        
+        // Si la cita dura más de 30 minutos, marcar también horas intermedias
+        try {
+          final inicio = DateTime.parse('2000-01-01 $horaInicio:00');
+          final fin = DateTime.parse('2000-01-01 $horaFin:00');
+          
+          DateTime actual = inicio;
+          while (actual.isBefore(fin)) {
+            String horaActual = '${actual.hour.toString().padLeft(2, '0')}:${actual.minute.toString().padLeft(2, '0')}';
+            if (!horasOcupadas.contains(horaActual)) {
+              horasOcupadas.add(horaActual);
+            }
+            actual = actual.add(const Duration(minutes: 30)); // Incremento de 30 minutos
+          }
+        } catch (e) {
+          print('⚠️ Error procesando horario: $e');
+          // Si hay error en el parsing, al menos agregar la hora de inicio
+          if (!horasOcupadas.contains(horaInicio)) {
+            horasOcupadas.add(horaInicio);
+          }
+        }
+      }
+      
+      print('🚫 Lista final de horas ocupadas: $horasOcupadas');
+        // Filtrar horas pasadas si es hoy
       final now = DateTime.now();
       final isToday = fecha.year == now.year && 
                      fecha.month == now.month && 
                      fecha.day == now.day;
       
       List<String> disponibles = todasLasHoras.where((hora) {
-        // Filtrar horas ocupadas
-        if (horasOcupadas.contains(hora)) return false;
+        // Filtrar horas ocupadas (comparación exacta)
+        if (horasOcupadas.contains(hora)) {
+          print('🚫 Hora $hora está ocupada, se excluye de disponibles');
+          return false;
+        }
         
         // Si es hoy, filtrar horas pasadas
         if (isToday) {
@@ -154,7 +203,10 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
             int.parse(hora.split(':')[0]), 
             int.parse(hora.split(':')[1])
           );
-          if (horaDateTime.isBefore(now)) return false;
+          if (horaDateTime.isBefore(now.add(const Duration(minutes: 30)))) {
+            print('🕐 Hora $hora ya pasó, se excluye de disponibles');
+            return false;
+          }
         }
         
         return true;
@@ -236,11 +288,29 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
       final horaFinString = '${horaFin.hour.toString().padLeft(2, '0')}:${horaFin.minute.toString().padLeft(2, '0')}';
       
       print('⏰ Hora fin calculada: $horaFinString');
-      
-      // Verificar que los IDs no sean null
+        // Verificar que los IDs no sean null
       if (widget.animalData['id'] == null || widget.veterinario['id'] == null) {
         throw Exception('Error: IDs de animal o veterinario no válidos');
       }
+      
+      // VALIDACIÓN ADICIONAL: Verificar que la hora sigue disponible antes de insertar
+      // Esto previene condiciones de carrera cuando múltiples usuarios intentan reservar la misma hora
+      print('🔍 Validación final: verificando que la hora $selectedHora sigue disponible...');
+      
+      final verificacionCitas = await Supabase.instance.client
+          .from('citas')
+          .select('id, hora_inicio, animal_id')
+          .eq('veterinario_id', widget.veterinario['id'])
+          .eq('fecha', selectedDate.toString().split(' ')[0])
+          .eq('hora_inicio', '$selectedHora:00')
+          .inFilter('estado', ['programada', 'confirmada']);
+      
+      if (verificacionCitas.isNotEmpty) {
+        print('❌ La hora $selectedHora ya fue reservada por otro usuario');
+        throw Exception('HORA_OCUPADA: Esta hora ya fue reservada por otro usuario. Por favor, selecciona otra hora.');
+      }
+      
+      print('✅ Hora $selectedHora confirmada como disponible, procediendo con la creación...');
       
       // Crear la cita en la base de datos
       final citaData = {
@@ -321,14 +391,17 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
       
       if (mounted) {
         String errorMessage = 'Error al crear la cita';
-        
-        // Personalizar mensaje según el error
+          // Personalizar mensaje según el error
         if (e.toString().contains('check_no_fin_semana')) {
           errorMessage = 'No se pueden agendar citas en fines de semana';
         } else if (e.toString().contains('check_horario_valido')) {
           errorMessage = 'Horario no válido. Horarios: 9:00-13:30 y 17:00-20:30';
         } else if (e.toString().contains('unique_veterinario_fecha_hora')) {
           errorMessage = 'Esta hora ya está ocupada. Selecciona otra hora.';
+        } else if (e.toString().contains('HORA_OCUPADA')) {
+          errorMessage = 'Esta hora fue reservada por otro usuario. Selecciona otra hora.';
+          // Recargar horas disponibles para actualizar la vista
+          _loadHorasDisponibles(selectedDate);
         } else if (e.toString().contains('IDs')) {
           errorMessage = 'Error en los datos del animal o veterinario';
         }
@@ -368,6 +441,29 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
         );
       }
     }
+  }
+
+  // Auto-actualización de horas disponibles cada 30 segundos (solo en paso de selección de hora)
+  Timer? _autoRefreshTimer;
+  
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel(); // Cancelar timer anterior si existe
+    
+    if (currentStep == 2) { // Solo en el paso de selección de hora
+      _autoRefreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+        if (mounted && currentStep == 2) {
+          print('🔄 Auto-actualizando horas disponibles...');
+          _loadHorasDisponibles(selectedDate);
+        } else {
+          timer.cancel();
+        }
+      });
+    }
+  }
+  
+  void _stopAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = null;
   }
 
   @override
@@ -467,6 +563,7 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                             SizedBox(
                               width: double.infinity,
                               child: ElevatedButton(                                onPressed: () {
+                                  _stopAutoRefresh(); // Detener auto-actualización al cambiar paso
                                   setState(() {
                                     currentStep = 1; // Avanzar al paso de selección de motivo
                                   });
@@ -504,8 +601,8 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                             Row(
                               children: [
                                 Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () {
+                                  child: ElevatedButton(                                    onPressed: () {
+                                      _stopAutoRefresh(); // Detener auto-actualización
                                       setState(() {
                                         currentStep = 0; // Volver a selección de fecha
                                       });
@@ -631,8 +728,8 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                               children: [
                                 Expanded(
                                   flex: 1,
-                                  child: ElevatedButton(
-                                    onPressed: () {
+                                  child: ElevatedButton(                                    onPressed: () {
+                                      _stopAutoRefresh(); // Detener auto-actualización
                                       setState(() {
                                         currentStep = 1; // Volver a selección de motivo
                                       });
@@ -970,14 +1067,14 @@ class _CitaCalendarState extends State<CitaCalendar> with TickerProviderStateMix
                 final motivo = motivosYPrecios[index];
                 final isSelected = motivo['motivo'] == selectedMotivo;
                 
-                return GestureDetector(
-                  onTap: () {
+                return GestureDetector(                  onTap: () {
                     setState(() {
                       selectedMotivo = motivo['motivo'];
                       selectedPrecio = motivo['precio'];
                       currentStep = 2; // Avanzar al siguiente paso (selección de hora)
                     });
                     _loadHorasDisponibles(selectedDate); // Cargar horas disponibles
+                    _startAutoRefresh(); // Iniciar auto-actualización de horas
                   },
                   child: Container(
                     margin: const EdgeInsets.only(bottom: 8),
