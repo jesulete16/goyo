@@ -17,8 +17,10 @@ class MenuAnimal extends StatefulWidget {
 class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
   List<Map<String, dynamic>> veterinarios = [];
   List<Map<String, dynamic>> misCitas = [];
+  List<Map<String, dynamic>> notificaciones = [];
   bool isLoading = true;
   bool isLoadingCitas = false;
+  bool isLoadingNotificaciones = false;
   String? errorMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -27,7 +29,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -39,9 +41,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       parent: _animationController,
       curve: Curves.easeInOut,
     ));
-    
-    _loadVeterinarios();
+      _loadVeterinarios();
     _loadMisCitas();
+    _loadNotificaciones();
     _animationController.forward();
   }
 
@@ -168,7 +170,123 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
       });
     }
   }
+  Future<void> _loadNotificaciones() async {
+    setState(() => isLoadingNotificaciones = true);
+    
+    try {
+      print('🔔 Cargando notificaciones del animal: ${widget.userData['id']}');
+      
+      // Buscar TODAS las citas del animal en los últimos 30 días
+      final fechaLimite = DateTime.now().subtract(const Duration(days: 30));
+      
+      final response = await Supabase.instance.client
+          .from('citas')
+          .select('''
+            id,
+            fecha,
+            hora_inicio,
+            hora_fin,
+            motivo,
+            estado,
+            precio,
+            updated_at,
+            created_at,
+            veterinarios!inner(
+              nombre,
+              especialidad
+            )
+          ''')
+          .eq('animal_id', widget.userData['id'])
+          .gte('created_at', fechaLimite.toIso8601String())
+          .order('updated_at', ascending: false);
+      
+      print('🔔 Citas encontradas para notificaciones: ${response.length}');
+      
+      // Crear notificaciones para todas las citas relevantes
+      List<Map<String, dynamic>> notificacionesFiltradas = [];
+      
+      for (var cita in response) {
+        print('🔔 Procesando cita ID: ${cita['id']}, Estado: ${cita['estado']}');
+        
+        String tipoNotificacion = '';
+        String mensaje = '';
+        IconData icono = Icons.info;
+        Color color = Colors.blue;
+        bool esNotificacionValida = false;
+        
+        switch (cita['estado']) {
+          case 'programada':
+            tipoNotificacion = '✅ Cita Aceptada';
+            mensaje = 'El Dr. ${cita['veterinarios']['nombre']} ha ACEPTADO tu solicitud de cita para el ${_formatearFecha(cita['fecha'])} a las ${cita['hora_inicio']}';
+            icono = Icons.check_circle;
+            color = Colors.green;
+            esNotificacionValida = true;
+            break;
+            
+          case 'cancelada':
+            tipoNotificacion = '❌ Cita Cancelada';
+            mensaje = 'El Dr. ${cita['veterinarios']['nombre']} ha CANCELADO tu cita del ${_formatearFecha(cita['fecha'])} a las ${cita['hora_inicio']}';
+            icono = Icons.cancel;
+            color = Colors.red;
+            esNotificacionValida = true;
+            break;
+            
+          case 'completada':
+            tipoNotificacion = '✅ Cita Completada';
+            mensaje = 'Tu cita con Dr. ${cita['veterinarios']['nombre']} ha sido completada exitosamente';
+            icono = Icons.done_all;
+            color = Colors.blue;
+            esNotificacionValida = true;
+            break;
+            
+          case 'pendiente':
+            tipoNotificacion = '⏳ Solicitud Enviada';
+            mensaje = 'Tu solicitud de cita con Dr. ${cita['veterinarios']['nombre']} está pendiente de aprobación para el ${_formatearFecha(cita['fecha'])} a las ${cita['hora_inicio']}';
+            icono = Icons.schedule;
+            color = Colors.orange;
+            esNotificacionValida = true;
+            break;
+        }
+        
+        if (esNotificacionValida) {
+          print('🔔 Agregando notificación: $tipoNotificacion');
+          notificacionesFiltradas.add({
+            ...cita,
+            'tipo_notificacion': tipoNotificacion,
+            'mensaje': mensaje,
+            'icono': icono,
+            'color': color,
+          });
+        }
+      }
+      
+      print('🔔 Total notificaciones creadas: ${notificacionesFiltradas.length}');
+      
+      setState(() {
+        notificaciones = notificacionesFiltradas;
+        isLoadingNotificaciones = false;
+      });
+    } catch (e) {
+      print('🚨 Error cargando notificaciones: $e');
+      setState(() {
+        notificaciones = [];
+        isLoadingNotificaciones = false;
+      });
+    }
+  }
 
+  String _formatearFecha(String fecha) {
+    try {
+      final fechaDate = DateTime.parse(fecha);
+      final meses = [
+        'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+      ];
+      return '${fechaDate.day} de ${meses[fechaDate.month - 1]}';
+    } catch (e) {
+      return fecha;
+    }
+  }
   void _pedirCita(Map<String, dynamic> veterinario) {
     showDialog(
       context: context,
@@ -179,8 +297,9 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
         );
       },
     ).then((_) {
-      // Recargar las citas después de cerrar el calendario
+      // Recargar las citas Y las notificaciones después de cerrar el calendario
       _loadMisCitas();
+      _loadNotificaciones();
     });
   }
 
@@ -237,10 +356,18 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
               // No podemos modificar widget.userData directamente, 
               // pero podemos actualizar campos específicos si es necesario
             });
-          },
-        ),
+          },        ),
       ),
     );
+  }
+
+  Future<void> _recargarTodosDatos() async {
+    print('🔄 Recargando todos los datos del menú animal...');
+    await Future.wait([
+      _loadVeterinarios(),
+      _loadMisCitas(),
+      _loadNotificaciones(),
+    ]);
   }
 
   @override
@@ -418,8 +545,7 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                     labelStyle: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: isDesktop ? 14 : 12,
-                    ),
-                    tabs: const [
+                    ),                    tabs: const [
                       Tab(
                         icon: Icon(Icons.medical_services),
                         text: 'Veterinarios',
@@ -428,6 +554,10 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                         icon: Icon(Icons.calendar_today),
                         text: 'Mis Citas',
                       ),
+                      Tab(
+                        icon: Icon(Icons.notifications),
+                        text: 'Notificaciones',
+                      ),
                     ],
                   ),
                 ),
@@ -435,12 +565,13 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                 // TabBarView content
                 Expanded(
                   child: TabBarView(
-                    controller: _tabController,
-                    children: [
+                    controller: _tabController,                    children: [
                       // Pestaña de Veterinarios
                       _buildVeterinariosTab(isDesktop),
                       // Pestaña de Mis Citas
                       _buildMisCitasTab(isDesktop),
+                      // Pestaña de Notificaciones
+                      _buildNotificacionesTab(isDesktop),
                     ],
                   ),
                 ),
@@ -1239,6 +1370,316 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
           ),
         ),
       ],
+    );
+  }
+  Widget _buildNotificacionesTab(bool isDesktop) {
+    return Column(
+      children: [
+        // Header con botón de actualizar
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: isDesktop ? 16 : 12, vertical: 8),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.notifications,
+                color: Colors.orangeAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'Notificaciones',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ),
+              // Botón de actualizar
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.refresh, color: Colors.orangeAccent),
+                  onPressed: isLoadingNotificaciones ? null : () {
+                    print('🔄 Actualizando notificaciones manualmente...');
+                    _loadNotificaciones();
+                  },
+                  tooltip: 'Actualizar notificaciones',
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (!isLoadingNotificaciones)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orangeAccent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${notificaciones.length} notificación${notificaciones.length != 1 ? 'es' : ''}',
+                    style: const TextStyle(
+                      color: Colors.orangeAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        
+        // Contenido de notificaciones
+        Expanded(
+          child: _buildNotificacionesContent(isDesktop),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotificacionesContent(bool isDesktop) {
+    if (isLoadingNotificaciones) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: Colors.orangeAccent),
+            SizedBox(height: 16),
+            Text(
+              'Cargando notificaciones...',
+              style: TextStyle(color: Colors.white70, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (notificaciones.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.notifications_none,
+              color: Colors.white54,
+              size: isDesktop ? 80 : 60,
+            ),
+            SizedBox(height: isDesktop ? 16 : 12),
+            Text(
+              'No tienes notificaciones',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isDesktop ? 18 : 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: isDesktop ? 8 : 6),
+            Text(
+              'Aquí aparecerán las actualizaciones de tus citas',
+              style: TextStyle(
+                color: Colors.white54,
+                fontSize: isDesktop ? 14 : 12,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadNotificaciones,
+      color: Colors.orangeAccent,
+      child: ListView.builder(
+        padding: EdgeInsets.all(isDesktop ? 16 : 12),
+        itemCount: notificaciones.length,
+        itemBuilder: (context, index) {
+          final notificacion = notificaciones[index];
+          return _buildNotificacionCard(notificacion, isDesktop);
+        },
+      ),
+    );
+  }
+
+  Widget _buildNotificacionCard(Map<String, dynamic> notificacion, bool isDesktop) {
+    final tiempoTranscurrido = DateTime.now().difference(DateTime.parse(notificacion['updated_at']));
+    String tiempoTexto;
+    
+    if (tiempoTranscurrido.inDays > 0) {
+      tiempoTexto = 'Hace ${tiempoTranscurrido.inDays} día${tiempoTranscurrido.inDays > 1 ? 's' : ''}';
+    } else if (tiempoTranscurrido.inHours > 0) {
+      tiempoTexto = 'Hace ${tiempoTranscurrido.inHours} hora${tiempoTranscurrido.inHours > 1 ? 's' : ''}';
+    } else if (tiempoTranscurrido.inMinutes > 0) {
+      tiempoTexto = 'Hace ${tiempoTranscurrido.inMinutes} minuto${tiempoTranscurrido.inMinutes > 1 ? 's' : ''}';
+    } else {
+      tiempoTexto = 'Hace un momento';
+    }
+
+    return Container(
+      margin: EdgeInsets.only(bottom: isDesktop ? 16 : 12),
+      padding: EdgeInsets.all(isDesktop ? 16 : 12),
+      decoration: BoxDecoration(
+        color: notificacion['color'].withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: notificacion['color'].withOpacity(0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header de la notificación
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: notificacion['color'].withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  notificacion['icono'],
+                  color: notificacion['color'],
+                  size: isDesktop ? 20 : 18,
+                ),
+              ),
+              SizedBox(width: isDesktop ? 12 : 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notificacion['tipo_notificacion'],
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: isDesktop ? 16 : 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      tiempoTexto,
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: isDesktop ? 12 : 10,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (notificacion['estado'] == 'programada')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.greenAccent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'ACEPTADA',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              else if (notificacion['estado'] == 'cancelada')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'CANCELADA',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          
+          SizedBox(height: isDesktop ? 12 : 8),
+          
+          // Mensaje de la notificación
+          Container(
+            padding: EdgeInsets.all(isDesktop ? 12 : 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notificacion['mensaje'],
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: isDesktop ? 14 : 12,
+                    height: 1.4,
+                  ),
+                ),
+                if (notificacion['motivo'] != null) ...[
+                  SizedBox(height: isDesktop ? 8 : 6),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.medical_services,
+                        color: Colors.white70,
+                        size: isDesktop ? 14 : 12,
+                      ),
+                      SizedBox(width: isDesktop ? 6 : 4),
+                      Text(
+                        'Motivo: ${notificacion['motivo']}',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isDesktop ? 12 : 10,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (notificacion['precio'] != null) ...[
+                  SizedBox(height: isDesktop ? 6 : 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.euro,
+                        color: Colors.white70,
+                        size: isDesktop ? 14 : 12,
+                      ),
+                      SizedBox(width: isDesktop ? 6 : 4),
+                      Text(
+                        'Precio: €${notificacion['precio']}',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isDesktop ? 12 : 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

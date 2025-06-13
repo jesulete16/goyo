@@ -24,6 +24,8 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
   String? _errorMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+  int _conteoSolicitudesPendientes = 0;
+
   @override
   void initState() {
     super.initState();
@@ -45,6 +47,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
     ));
     
     _loadCitasVeterinario();
+    _loadConteoSolicitudes();
     _animationController.forward();
   }
 
@@ -97,20 +100,40 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
         }
         citasPorFecha[fechaSinHora]!.add(cita);
       }
-      
-      setState(() {
+        setState(() {
         _citasCalendario = citasPorFecha;
         _isLoading = false;
         _errorMessage = null;
         // Cargar citas del día seleccionado
         _loadCitasDelDia(_selectedDay ?? DateTime.now());
       });
+      
+      // También actualizar el conteo de solicitudes
+      _loadConteoSolicitudes();
     } catch (e) {
       print('🚨 Error cargando citas: $e');
       setState(() {
         _isLoading = false;
         _errorMessage = 'Error al cargar citas: ${e.toString()}';
       });
+    }
+  }
+
+  Future<void> _loadConteoSolicitudes() async {
+    try {
+      final response = await Supabase.instance.client
+          .from('citas')
+          .select('id')
+          .eq('veterinario_id', widget.userData['id'])
+          .eq('estado', 'pendiente');
+      
+      setState(() {
+        _conteoSolicitudesPendientes = response.length;
+      });
+      
+      print('📊 Solicitudes pendientes encontradas: $_conteoSolicitudesPendientes');
+    } catch (e) {
+      print('🚨 Error cargando conteo de solicitudes: $e');
     }
   }
 
@@ -351,7 +374,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
               onTap: () => Navigator.pop(context),
             ),
             ListTile(
-              leading: const Icon(Icons.pending_actions, color: Colors.orangeAccent),
+              leading: _buildBadgeIcon(Icons.pending_actions, Colors.orangeAccent, _conteoSolicitudesPendientes),
               title: const Text('Solicitudes', style: TextStyle(color: Colors.white)),              onTap: () async {
                 Navigator.pop(context);
                 final result = await Navigator.push(
@@ -462,7 +485,7 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
                                 _loadCitasVeterinario();
                               }
                             },
-                            icon: const Icon(Icons.pending_actions, color: Colors.orangeAccent),
+                            icon: _buildBadgeIcon(Icons.pending_actions, Colors.orangeAccent, _conteoSolicitudesPendientes),
                             tooltip: 'Solicitudes Pendientes',
                           ),
                           IconButton(
@@ -956,6 +979,40 @@ class _MenuVeterinarioState extends State<MenuVeterinario> with TickerProviderSt
           ),
         ],
       ),
+    );
+  }
+  Widget _buildBadgeIcon(IconData icon, Color color, int count) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(icon, color: color, size: 24),
+        if (count > 0)
+          Positioned(
+            right: -6,
+            top: -6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              constraints: const BoxConstraints(
+                minWidth: 18,
+                minHeight: 18,
+              ),
+              child: Text(
+                count > 9 ? '+9' : count.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
