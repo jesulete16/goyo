@@ -733,19 +733,22 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
     
     // Determinar color según el estado
     Color estadoColor;
-    IconData estadoIcon;
-    switch (estado) {
+    IconData estadoIcon;    switch (estado) {
       case 'programada':
-        estadoColor = Colors.blueAccent;
+        estadoColor = Colors.orange; // Amarillo/naranja para programada
         estadoIcon = Icons.schedule;
         break;
       case 'completada':
-        estadoColor = Colors.greenAccent;
+        estadoColor = Colors.green; // Verde para completada
         estadoIcon = Icons.check_circle;
         break;
       case 'cancelada':
-        estadoColor = Colors.redAccent;
+        estadoColor = Colors.red; // Rojo para cancelada
         estadoIcon = Icons.cancel;
+        break;
+      case 'confirmada':
+        estadoColor = Colors.blue; // Azul para confirmada
+        estadoIcon = Icons.verified;
         break;
       default:
         estadoColor = Colors.grey;
@@ -753,12 +756,11 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: isDesktop ? 16 : 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+      margin: EdgeInsets.only(bottom: isDesktop ? 16 : 12),      decoration: BoxDecoration(
+        color: estadoColor.withOpacity(0.1), // Fondo con tinte del color del estado
         borderRadius: BorderRadius.circular(isDesktop ? 20 : 16),
         border: Border.all(
-          color: estadoColor.withOpacity(0.3),
+          color: estadoColor.withOpacity(0.5), // Borde más visible
           width: 2,
         ),
         boxShadow: [
@@ -812,20 +814,41 @@ class _MenuAnimalState extends State<MenuAnimal> with TickerProviderStateMixin {
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: estadoColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
+                    ),                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isDesktop ? 16 : 12, 
+                        vertical: isDesktop ? 8 : 6
                       ),
-                      child: Text(
-                        estado.toUpperCase(),
-                        style: TextStyle(
-                          color: estadoColor,
-                          fontSize: isDesktop ? 12 : 10,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      decoration: BoxDecoration(
+                        color: estadoColor, // Fondo sólido del color del estado
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: estadoColor.withOpacity(0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            estadoIcon,
+                            color: Colors.white,
+                            size: isDesktop ? 16 : 14,
+                          ),
+                          SizedBox(width: isDesktop ? 6 : 4),
+                          Text(
+                            estado.toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: isDesktop ? 12 : 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
